@@ -256,9 +256,15 @@ export default function AdminDashboard() {
                       </div>
 
                       <div style={{ background: "rgba(255,255,255,0.01)", padding: 14, borderRadius: 6, fontSize: 13, color: "var(--text-secondary)", marginBottom: 16 }}>
-                        <div style={{ marginBottom: 10 }}><strong>Rounds:</strong> {exp.rounds.map(r => r.title).join(" -> ")}</div>
-                        <div style={{ marginBottom: 10 }}><strong>Tech Evaluated:</strong> {(exp.technologies || []).join(", ") || "None"}</div>
-                        <div><strong>Advice:</strong> {exp.prepTips || "None"}</div>
+                        <div style={{ marginBottom: 10 }}><strong>Role:</strong> {exp.roleOffered || "Not specified"}</div>
+                        <div style={{ marginBottom: 10 }}>
+                          <strong>Package:</strong> {exp.ctc ? `${exp.ctc} LPA` : "Not specified"}
+                          {exp.stipend ? ` - Stipend: Rs. ${exp.stipend}` : ""}
+                        </div>
+                        <div style={{ marginBottom: 10 }}><strong>Rating:</strong> {exp.overallRating ? `${exp.overallRating}/5` : "Not rated"}</div>
+                        <div style={{ marginBottom: 10 }}><strong>Rounds:</strong> {(exp.rounds || []).map(r => r.title).join(" -> ") || "None added"}</div>
+                        <div style={{ marginBottom: 10 }}><strong>Tags:</strong> {(exp.tags || exp.technologies || []).join(", ") || "None"}</div>
+                        <div><strong>Overall Experience:</strong> {exp.overallExperience || exp.prepTips || "None"}</div>
                       </div>
 
                       <div style={{ display: "flex", gap: 8 }}>

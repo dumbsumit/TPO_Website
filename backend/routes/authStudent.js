@@ -17,6 +17,9 @@ import {
 
 const router = express.Router();
 const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || "walchandsangli.ac.in";
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "tpo_access_secret_key_123456789_abcdef";
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "tpo_refresh_secret_key_987654321_fedcba";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "69719983983-t4s37hm9b4nnu6obf22d3urr30rbo4qk.apps.googleusercontent.com";
 
 // --- Domain validation ---
 const isDomainAllowed = (email) =>
@@ -80,13 +83,13 @@ const issueStudentTokens = async (student, res) => {
     graduationYear: student.graduationYear,
   };
 
-  const accessToken = jwt.sign(accessPayload, process.env.JWT_ACCESS_SECRET, {
+  const accessToken = jwt.sign(accessPayload, JWT_ACCESS_SECRET, {
     expiresIn: "15m",
   });
 
   const refreshToken = jwt.sign(
     { id: student._id, role: "student" },
-    process.env.JWT_REFRESH_SECRET,
+    JWT_REFRESH_SECRET,
     { expiresIn: "7d" }
   );
 
@@ -314,14 +317,14 @@ router.post("/google", async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: "Google credential token is required" });
 
-    if (!process.env.GOOGLE_CLIENT_ID) {
+    if (!GOOGLE_CLIENT_ID) {
       return res.status(503).json({ message: "Google authentication is not configured on this server" });
     }
 
-    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    const client = new OAuth2Client(GOOGLE_CLIENT_ID);
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: GOOGLE_CLIENT_ID,
     });
 
     const payload = ticket.getPayload();
@@ -374,7 +377,7 @@ router.post("/refresh", async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
     } catch {
       clearStudentCookies(res);
       return res.status(401).json({ message: "Invalid or expired refresh token" });

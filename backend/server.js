@@ -22,14 +22,30 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Disable Mongoose buffering so queries fail fast with clear message when DB is disconnected
+mongoose.set("bufferCommands", false);
+
+// ─── Database Check Middleware ────────────────────────────────────────────────
+const checkDbConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      message: "Database connection unavailable. Please start MongoDB service (port 27017) or configure MONGO_URI in backend/.env"
+    });
+  }
+  next();
+};
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth/admin",   authAdminRouter);
-app.use("/api/auth/student", authStudentRouter);
+app.use("/api/auth/admin",   checkDbConnection, authAdminRouter);
+app.use("/api/auth/student", checkDbConnection, authStudentRouter);
 app.use("/api",              router);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ message: "Placement Activity Portal Backend API is running." });
+  res.json({ 
+    message: "Placement Activity Portal Backend API is running.",
+    databaseConnected: mongoose.connection.readyState === 1
+  });
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
@@ -39,10 +55,17 @@ app.listen(PORT, () => {
 
 // ─── Database Connection ──────────────────────────────────────────────────────
 mongoose.connect(MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log("Connected to MongoDB successfully.");
     console.log("Note: Run 'node scripts/createAdmin.js' to create the TPO admin account.");
+    
+    // Automatically clean up legacy indexes from old schemas if present
+    try {
+      const studentsColl = mongoose.connection.collection("students");
+      await studentsColl.dropIndex("prn_1").catch(() => {});
+      await studentsColl.dropIndex("username_1").catch(() => {});
+    } catch (_) {}
   })
   .catch(err => {
-    console.error("MongoDB connection error:", err);
+    console.error("MongoDB connection error:", err.message);
   });

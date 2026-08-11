@@ -30,6 +30,8 @@ export const clearStudentCookies = (res) => {
   res.clearCookie(STUDENT_REFRESH_COOKIE, { httpOnly: true, path: "/" });
 };
 
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "tpo_access_secret_key_123456789_abcdef";
+
 // --- Middleware: Authenticate Admin ---
 export const authenticateAdmin = (req, res, next) => {
   const token = req.cookies?.[ADMIN_ACCESS_COOKIE];
@@ -37,7 +39,7 @@ export const authenticateAdmin = (req, res, next) => {
     return res.status(401).json({ message: "Admin authentication required" });
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
     if (decoded.role !== "tpo_admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
@@ -56,7 +58,7 @@ export const authenticateStudent = (req, res, next) => {
     return res.status(401).json({ message: "Student authentication required" });
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const decoded = jwt.verify(token, JWT_ACCESS_SECRET);
     if (decoded.role !== "student") {
       return res.status(403).json({ message: "Student access required" });
     }

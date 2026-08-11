@@ -14,20 +14,30 @@ const CompanySchema = new mongoose.Schema({
 
 // ─── Experience ───────────────────────────────────────────────────────────────
 const RoundSchema = new mongoose.Schema({
-  title:   { type: String, required: true },
-  content: { type: String, required: true },
+  title:      { type: String, required: true },
+  difficulty: { type: String, default: "Medium" },
+  content:    { type: String, default: "" },
 });
 
 const ExperienceSchema = new mongoose.Schema({
-  studentName:    { type: String, default: "Anonymous" },
-  branch:         { type: String, required: true },
-  graduationYear: { type: Number, required: true },
-  companyId:      { type: mongoose.Schema.Types.ObjectId, ref: "Company", default: null },
-  companyName:    { type: String, required: true },
-  status:         { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
-  rounds:         [RoundSchema],
-  technologies:   [{ type: String }],
-  prepTips:       { type: String, default: "" },
+  studentName:       { type: String, default: "Anonymous" },
+  email:             { type: String, default: "" },
+  contactNumber:     { type: String, default: "" },
+  branch:            { type: String, required: true },
+  graduationYear:    { type: Number, required: true },
+  companyId:         { type: mongoose.Schema.Types.ObjectId, ref: "Company", default: null },
+  companyName:       { type: String, required: true },
+  roleOffered:       { type: String, default: "" },
+  ctc:               { type: Number, default: null },
+  stipend:           { type: Number, default: null },
+  interviewDate:     { type: Date, default: null },
+  overallExperience: { type: String, default: "" },
+  overallRating:     { type: Number, min: 0, max: 5, default: 0 },
+  tags:              [{ type: String }],
+  status:            { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+  rounds:            [RoundSchema],
+  technologies:      [{ type: String }],
+  prepTips:          { type: String, default: "" },
 }, { timestamps: true });
 
 // ─── Statistics ───────────────────────────────────────────────────────────────

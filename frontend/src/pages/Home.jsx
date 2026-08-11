@@ -6,6 +6,43 @@ import {
   Trophy, Briefcase, Building2, CheckCircle2, ShieldCheck 
 } from "lucide-react";
 
+const RECRUITING_PARTNERS = [
+  { name: "Google", logo: "/logos/google.jpg" },
+  { name: "Amazon", logo: "/logos/amazon.jpg" },
+  { name: "TCS", logo: "/logos/tcs.png" },
+  { name: "IBM", logo: "/logos/ibm.png" },
+  { name: "Oracle", logo: "/logos/oracle.png" },
+  { name: "Siemens", logo: "/logos/seimens2.png" },
+  { name: "Philips", logo: "/logos/philips.png" },
+  { name: "Schneider Electric", logo: "/logos/schnider.jpg" },
+  { name: "Ather Energy", logo: "/logos/AtherLogo.jpg" },
+  { name: "Thoughtworks", logo: "/logos/thoughtworks.png" },
+  { name: "Hindustan Unilever", logo: "/logos/hul.png" },
+  { name: "Maersk", logo: "/logos/maersk.png" },
+  { name: "DP World", logo: "/logos/dpworld.png" },
+  { name: "Hitachi", logo: "/logos/hitachi.png" },
+  { name: "HPCL", logo: "/logos/hpcl.jpeg" },
+  { name: "Baker Hughes", logo: "/logos/bakerhuges.png" },
+  { name: "Bentley Systems", logo: "/logos/bentley.jpeg" },
+  { name: "Bizom", logo: "/logos/bizom.png" },
+  { name: "ConnectWise", logo: "/logos/connectwise.png" },
+  { name: "Cooper Corporation", logo: "/logos/cooper.png" },
+  { name: "IDeaS (SAS)", logo: "/logos/ideas sas .png" },
+  { name: "Kaiser Permanente", logo: "/logos/kaiserpermanente.png" },
+  { name: "NICE Systems", logo: "/logos/nice.jpeg" },
+  { name: "OneSubsea", logo: "/logos/onesubsea.png" },
+  { name: "Platform9", logo: "/logos/platfrom9.png" },
+  { name: "Privado", logo: "/logos/privado.png" },
+  { name: "PTC", logo: "/logos/ptc.png" },
+  { name: "PubMatic", logo: "/logos/pubmatic.png" },
+  { name: "Seagate", logo: "/logos/seafate.jpeg" },
+  { name: "Thornton Tomasetti", logo: "/logos/throntonthomessati.png" },
+  { name: "UBS", logo: "/logos/ubs.png" },
+  { name: "Wayfair", logo: "/logos/wayfair.png" },
+  { name: "Zensar", logo: "/logos/zensar.png" },
+  { name: "AutomationEdge", logo: "/logos/automation edge.png" }
+];
+
 export default function Home() {
   const { API_URL } = useAppContext();
   const [stats, setStats] = useState({
@@ -211,25 +248,57 @@ export default function Home() {
         </div>
 
         {/* 4. HIRING PARTNERS GRID PANEL */}
-        <div className="hiring-partners-panel" style={{ border: "1px solid var(--border-color)", padding: "30px", borderRadius: "var(--radius-md)", background: "var(--bg-secondary)" }}>
-          <h3 className="partners-title">Our Recruiting Partners</h3>
+        <div className="hiring-partners-panel">
+          <div className="partners-title-container">
+            <h3 className="partners-title">Our Recruiting Partners</h3>
+            <p className="partners-subtitle">Leading global organizations hiring talent from Walchand College of Engineering</p>
+          </div>
           
           <div className="partners-grid">
-            <div className="partner-logo-card">Google</div>
-            <div className="partner-logo-card">Microsoft</div>
-            <div className="partner-logo-card">Amazon</div>
-            <div className="partner-logo-card">CRED</div>
-            <div className="partner-logo-card">TCS</div>
-            <div className="partner-logo-card">Infosys</div>
-            <div className="partner-logo-card">Pepsi</div>
-            <div className="partner-logo-card">OYO</div>
-            <div className="partner-logo-card">L&T</div>
-            <div className="partner-logo-card">Mahindra</div>
-            <div className="partner-logo-card">American Express</div>
-            <div className="partner-logo-card">Alstom</div>
-            <div className="partner-logo-card">Adani</div>
-            <div className="partner-logo-card">99acres</div>
-            <div className="partner-logo-card">Halonix</div>
+            {RECRUITING_PARTNERS.map((partner, idx) => (
+              <div
+                key={idx}
+                className="partner-flip-card"
+                title={partner.name}
+                onMouseEnter={(e) => {
+                  // Remove first so re-entering quickly always restarts the animation
+                  const inner = e.currentTarget.querySelector('.partner-flip-inner');
+                  e.currentTarget.classList.remove('is-spinning');
+                  // Force reflow so the browser registers the class removal
+                  void inner.offsetWidth;
+                  e.currentTarget.classList.add('is-spinning');
+                }}
+                onAnimationEnd={(e) => {
+                  // Clean up so the next mouseenter can re-add and re-trigger
+                  if (e.animationName === 'partner-spin') {
+                    e.currentTarget.classList.remove('is-spinning');
+                  }
+                }}
+              >
+                <div className="partner-flip-inner">
+                  {/* Front Face: Logo */}
+                  <div className="partner-card-front">
+                    <img
+                      src={partner.logo}
+                      alt={`${partner.name} logo`}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'block';
+                      }}
+                    />
+                    <span style={{ display: 'none', fontWeight: 'bold', fontSize: 13, color: 'var(--primary)' }}>
+                      {partner.name}
+                    </span>
+                  </div>
+
+                  {/* Back Face: Company Details */}
+                  <div className="partner-card-back">
+                    <span className="partner-name">{partner.name}</span>
+                    <span className="partner-sub">Recruiter</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
