@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
-import { useAppContext } from "../App";
-import { ChevronLeft, Briefcase, Calendar, Landmark, CheckSquare, Settings, Award, Users, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { useAppContext } from "../appContext";
+import { ChevronLeft, Briefcase, Calendar, CheckSquare, Settings, Award, Users, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function CompanyDetails() {
   const { id } = useParams();

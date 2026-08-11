@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5001;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/tpo_db";
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/tpo_db";
 
 // Middleware
 app.use(cors());
@@ -45,14 +45,14 @@ const seedDefaultData = async () => {
 };
 
 // Database Connection & Server Startup
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
 mongoose.connect(MONGO_URI)
   .then(async () => {
     console.log("Connected to MongoDB successfully.");
     await seedDefaultData();
-    
-    app.listen(PORT, () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-    });
   })
   .catch(err => {
     console.error("MongoDB connection error:", err);

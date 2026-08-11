@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAppContext } from "../App";
-import { Shield, KeyRound, AlertTriangle } from "lucide-react";
+import { useAppContext } from "../appContext";
+import { KeyRound, AlertTriangle } from "lucide-react";
 
 export default function AdminLogin() {
-  const { token, API_URL, loginAdmin, showToast } = useAppContext();
+  const { token, API_URL, loginAdmin } = useAppContext();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({ username: "", password: "" });
@@ -34,7 +34,8 @@ export default function AdminLogin() {
     setError("");
 
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, formData);
+      const loginUrl = `${API_URL.replace(/\/$/, "")}/auth/login`;
+      const response = await axios.post(loginUrl, formData);
       if (response.data && response.data.token) {
         loginAdmin(response.data.token, response.data.username);
         navigate("/admin-dashboard");

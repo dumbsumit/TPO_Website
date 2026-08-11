@@ -1,6 +1,6 @@
-import React, { useState, useEffect, createContext, useContext } from "react";
+import React, { useState } from "react";
 import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
-import { Terminal, Shield, LogOut, CheckCircle, AlertTriangle, Info, Menu, X } from "lucide-react";
+import { Shield, LogOut, CheckCircle, AlertTriangle, Info, Menu, X } from "lucide-react";
 
 // Import Pages
 import Home from "./pages/Home";
@@ -11,11 +11,7 @@ import Experiences from "./pages/Experiences";
 import SubmitExperience from "./pages/SubmitExperience";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
-
-// Context for Auth & Global UI Notifications
-const AppContext = createContext();
-
-export const useAppContext = () => useContext(AppContext);
+import { AppContext } from "./appContext";
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("tpo_admin_token") || "");

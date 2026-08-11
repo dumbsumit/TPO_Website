@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAppContext } from "../App";
-import { Trash2, Plus, Send, AlertCircle, Sparkles } from "lucide-react";
+import { useAppContext } from "../appContext";
+import { Trash2, Plus, Send, AlertCircle } from "lucide-react";
 
 export default function SubmitExperience() {
   const { API_URL, showToast } = useAppContext();

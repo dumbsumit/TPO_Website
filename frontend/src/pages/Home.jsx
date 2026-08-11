@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { useAppContext } from "../App";
+import { useAppContext } from "../appContext";
 import { 
-  Trophy, Briefcase, Building2, CheckCircle2, ChevronRight, Award, ShieldCheck, Check 
+  Trophy, Briefcase, Building2, CheckCircle2, ShieldCheck 
 } from "lucide-react";
 
 export default function Home() {
@@ -14,22 +14,29 @@ export default function Home() {
     highestPackage: 44.0,
     averagePackage: 11.8
   });
+  const [featuredExperiences, setFeaturedExperiences] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchHomeData = async () => {
       try {
-        const response = await axios.get(`${API_URL}/statistics`);
-        if (response.data) {
-          setStats(response.data);
+        const [statsResponse, experiencesResponse] = await Promise.all([
+          axios.get(`${API_URL}/statistics`),
+          axios.get(`${API_URL}/experiences`)
+        ]);
+
+        if (statsResponse.data) {
+          setStats(statsResponse.data);
         }
+
+        setFeaturedExperiences((experiencesResponse.data || []).slice(0, 3));
       } catch (err) {
-        console.error("Error fetching statistics:", err);
+        console.error("Error fetching home data:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchStats();
+    fetchHomeData();
   }, [API_URL]);
 
   return (
@@ -234,6 +241,53 @@ export default function Home() {
         <p style={{ color: "var(--text-secondary)", fontSize: 14.5, lineHeight: 1.6 }}>
           Recruiter spreadsheet submissions (Excel/CSV formats) are processed directly by TPO staff to ensure student placement statistics are updated in real-time. Students must maintain correct branch details and profile credentials on the main campus ERP platform to guarantee seamless credential matching during recruitment drives.
         </p>
+      </section>
+
+      {/* 6. FEATURED STUDENT RESPONSES */}
+      <section style={{ margin: "40px 0 10px" }}>
+        <h2 className="wce-heading">Featured Student Responses</h2>
+        <div className="wce-subheading">Recently approved by TPO for public viewing</div>
+        <div className="wce-divider"></div>
+
+        {loading ? (
+          <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)" }}>Loading approved responses...</div>
+        ) : featuredExperiences.length === 0 ? (
+          <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)" }}>
+            No student responses have been published yet.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
+            {featuredExperiences.map(exp => (
+              <article key={exp._id} className="card" style={{ padding: 22, borderTop: "3px solid var(--primary)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <h3 style={{ fontSize: 18, marginBottom: 4 }}>{exp.companyName}</h3>
+                    <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{exp.branch} · Class of {exp.graduationYear}</p>
+                  </div>
+                  <span className="tag" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", border: "none", fontWeight: 600 }}>
+                    ON HOME
+                  </span>
+                </div>
+
+                <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
+                  {exp.prepTips || "No extra advice was added with this response."}
+                </p>
+
+                <div style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span><strong>Student:</strong> {exp.studentName}</span>
+                  <span><strong>Rounds:</strong> {Array.isArray(exp.rounds) && exp.rounds.length > 0 ? exp.rounds.map(r => r.title).join(" -> ") : "Not listed"}</span>
+                  <span><strong>Technologies:</strong> {(exp.technologies || []).join(", ") || "None"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div style={{ textAlign: "center", marginTop: 18 }}>
+          <Link to="/experiences" className="btn btn-secondary" style={{ padding: "10px 18px" }}>
+            View All Responses
+          </Link>
+        </div>
       </section>
       
     </div>

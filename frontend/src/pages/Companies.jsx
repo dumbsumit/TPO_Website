@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { useAppContext } from "../App";
-import { Search, Calendar, Landmark, Briefcase, Users, Eye } from "lucide-react";
+import { useAppContext } from "../appContext";
+import { Search, Calendar, Briefcase, Users, Eye } from "lucide-react";
 
 export default function Companies() {
   const { API_URL } = useAppContext();

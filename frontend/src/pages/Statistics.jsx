@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useAppContext } from "../App";
+import { useAppContext } from "../appContext";
 import { Bar, Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -14,7 +14,7 @@ import {
   Legend,
   Filler
 } from "chart.js";
-import { Landmark, TrendingUp, ShieldAlert, Award } from "lucide-react";
+import { TrendingUp, ShieldAlert, Award } from "lucide-react";
 
 // Register ChartJS modules
 ChartJS.register(

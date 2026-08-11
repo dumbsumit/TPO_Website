@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { useAppContext } from "../App";
-import { Search, ChevronDown, ChevronUp, BookOpen, User, Calendar, Award } from "lucide-react";
+import { useAppContext } from "../appContext";
+import { Search, ChevronDown, ChevronUp, BookOpen, User, Award } from "lucide-react";
 
 export default function Experiences() {
   const { API_URL } = useAppContext();
