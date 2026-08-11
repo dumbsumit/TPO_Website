@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useId } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { LogIn, Mail, Lock } from "lucide-react";
+import { LogIn, Mail, Lock, UserPlus } from "lucide-react";
 import { subscribeGoogleCallback, renderGoogleButton, isGoogleConfigured } from "../googleAuth";
 
 const GoogleIcon = () => (
@@ -14,9 +14,9 @@ const GoogleIcon = () => (
 
 const ALLOWED_DOMAIN = "walchandsangli.ac.in";
 
-export default function AdminLogin({ onLogin }) {
+export default function StudentLogin({ onLogin }) {
   const navigate    = useNavigate();
-  const googleBtnId = "admin-google-btn-" + useId().replace(/:/g, "");
+  const googleBtnId = "student-login-google-btn-" + useId().replace(/:/g, "");
 
   const [form, setForm]       = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -34,16 +34,16 @@ export default function AdminLogin({ onLogin }) {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/admin/google", {
+      const res = await fetch("/api/auth/student/google", {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
         credentials: "include",
         body:        JSON.stringify({ token: response.credential }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Google login failed");
+      if (!res.ok) throw new Error(data.message || "Google sign-in failed");
       onLogin(data.user);
-      navigate("/admin-dashboard", { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,7 +51,7 @@ export default function AdminLogin({ onLogin }) {
     }
   };
 
-  // ── Email/Password submit ──────────────────────────────────────────────────
+  // ── Email/Password submit ─────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -63,16 +63,24 @@ export default function AdminLogin({ onLogin }) {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/admin/login", {
+      const res = await fetch("/api/auth/student/login", {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
         credentials: "include",
         body:        JSON.stringify(form),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Login failed");
+
+      if (!res.ok) {
+        if (data.requiresVerification) {
+          navigate("/verify-otp", { state: { email: data.email } });
+          return;
+        }
+        throw new Error(data.message || "Login failed");
+      }
+
       onLogin(data.user);
-      navigate("/admin-dashboard", { replace: true });
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -85,12 +93,12 @@ export default function AdminLogin({ onLogin }) {
       <div className="card" style={{ padding: "40px 36px" }}>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🎓</div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 6px" }}>
-            TPO Admin Login
+            Student Login
           </h1>
           <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
-            Only <strong>@{ALLOWED_DOMAIN}</strong> accounts are permitted
+            Use your <strong>@{ALLOWED_DOMAIN}</strong> college email
           </p>
         </div>
 
@@ -101,17 +109,17 @@ export default function AdminLogin({ onLogin }) {
           </div>
         )}
 
-        {/* Email + Password form */}
+        {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>
               <Mail size={13} style={{ marginRight: 5, verticalAlign: "middle" }} />Email
             </label>
             <input
-              id="admin-email"
+              id="student-login-email"
               type="email"
               required
-              placeholder={`tpo@${ALLOWED_DOMAIN}`}
+              placeholder={`yourname@${ALLOWED_DOMAIN}`}
               value={form.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 14, boxSizing: "border-box" }}
@@ -123,7 +131,7 @@ export default function AdminLogin({ onLogin }) {
               <Lock size={13} style={{ marginRight: 5, verticalAlign: "middle" }} />Password
             </label>
             <input
-              id="admin-password"
+              id="student-login-password"
               type="password"
               required
               placeholder="Enter your password"
@@ -134,7 +142,7 @@ export default function AdminLogin({ onLogin }) {
           </div>
 
           <button
-            id="admin-login-submit"
+            id="student-login-submit"
             type="submit"
             disabled={loading}
             className="btn btn-primary"
@@ -147,7 +155,7 @@ export default function AdminLogin({ onLogin }) {
         {/* Divider */}
         <Divider />
 
-        {/* Google Sign-In Button */}
+        {/* Google Sign-In */}
         <div style={{ display: "flex", justifyContent: "center" }}>
           {isGoogleConfigured() ? (
             <div id={googleBtnId} />
@@ -156,19 +164,28 @@ export default function AdminLogin({ onLogin }) {
           )}
         </div>
 
-        {/* Student link */}
-        <p style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "var(--text-muted)" }}>
-          Are you a student?{" "}
-          <Link to="/student-login" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>
-            Student Login
-          </Link>
-        </p>
+        {/* Register + Admin links */}
+        <div style={{ textAlign: "center", marginTop: 24, display: "flex", flexDirection: "column", gap: 8 }}>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+            Don&apos;t have an account?{" "}
+            <Link to="/student-register" style={{ color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>
+              <UserPlus size={13} style={{ marginRight: 3, verticalAlign: "middle" }} />Register
+            </Link>
+          </p>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
+            TPO Staff?{" "}
+            <Link to="/admin-login" style={{ color: "var(--text-secondary)", textDecoration: "none" }}>
+              Admin Login →
+            </Link>
+          </p>
+        </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
-// ── Shared sub-components ────────────────────────────────────────────────────
 const Spinner = () => (
   <span style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} />
 );
@@ -182,10 +199,7 @@ const Divider = () => (
 );
 
 const DisabledGoogleBtn = ({ label }) => (
-  <>
-    <button disabled style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-muted)", fontSize: 13, cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-      <GoogleIcon /> {label}
-    </button>
-    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-  </>
+  <button disabled style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-secondary)", color: "var(--text-muted)", fontSize: 13, cursor: "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+    <GoogleIcon /> {label}
+  </button>
 );
