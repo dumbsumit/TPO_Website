@@ -100,15 +100,19 @@ export default function App() {
                 <li>
                   <NavLink to="/companies">Companies</NavLink>
                 </li>
-                <li>
-                  <NavLink to="/statistics">Statistics</NavLink>
-                </li>
+                {token && (
+                  <li>
+                    <NavLink to="/statistics">Statistics</NavLink>
+                  </li>
+                )}
                 <li>
                   <NavLink to="/experiences">Experiences</NavLink>
                 </li>
-                <li>
-                  <NavLink to="/submit-experience">Share Experience</NavLink>
-                </li>
+                {!token && (
+                  <li>
+                    <NavLink to="/submit-experience">Share Experience</NavLink>
+                  </li>
+                )}
                 {token ? (
                   <>
                     <li>
@@ -149,7 +153,14 @@ export default function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/companies" element={<Companies />} />
                 <Route path="/companies/:id" element={<CompanyDetails />} />
-                <Route path="/statistics" element={<Statistics />} />
+                <Route 
+                  path="/statistics" 
+                  element={
+                    <ProtectedRoute>
+                      <Statistics />
+                    </ProtectedRoute>
+                  } 
+                />
                 <Route path="/experiences" element={<Experiences />} />
                 <Route path="/submit-experience" element={<SubmitExperience />} />
                 <Route path="/admin-login" element={<AdminLogin />} />
