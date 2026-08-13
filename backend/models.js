@@ -2,14 +2,14 @@ import mongoose from "mongoose";
 
 // ─── Company ──────────────────────────────────────────────────────────────────
 const CompanySchema = new mongoose.Schema({
-  name:           { type: String, required: true },
-  visitYear:      { type: Number, required: true },
-  role:           { type: String, required: true },
-  package:        { type: Number, required: true },
-  selectedCount:  { type: Number, required: true, default: 0 },
-  eligibility:    { type: String, default: "" },
-  technologies:   [{ type: String }],
-  hiringProcess:  { type: String, default: "" },
+  name: { type: String, required: true },
+  visitYear: { type: Number, required: true },
+  role: { type: String, required: true },
+  package: { type: Number, required: true }, // CTC in LPA
+  selectedCount: { type: Number, required: true, default: 0 },
+  eligibility: { type: String, default: "" },
+  technologies: [{ type: String }],
+  hiringProcess: { type: String, default: "" }
 }, { timestamps: true });
 
 // ─── Experience ───────────────────────────────────────────────────────────────
@@ -84,5 +84,3 @@ export const Company     = mongoose.model("Company",     CompanySchema);
 export const Experience  = mongoose.model("Experience",  ExperienceSchema);
 export const GlobalStats = mongoose.model("GlobalStats", GlobalStatsSchema);
 export const YearlyStats = mongoose.model("YearlyStats", YearlyStatsSchema);
-export const Admin       = mongoose.model("Admin",       AdminSchema);
-export const Student     = mongoose.model("Student",     StudentSchema);
