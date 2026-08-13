@@ -15,6 +15,8 @@ import AdminDashboard   from "./pages/AdminDashboard";
 import StudentLogin     from "./pages/StudentLogin";
 import StudentRegister  from "./pages/StudentRegister";
 import OTPVerify        from "./pages/OTPVerify";
+import AdminProfile     from "./pages/AdminProfile";
+import StudentProfile   from "./pages/StudentProfile";
 import { AppContext }   from "./appContext";
 
 const API_URL = "/api";
@@ -39,18 +41,14 @@ export default function App() {
         script?.addEventListener("load", initGoogleAuth, { once: true });
       }
 
-      try {
-        const [adminRes, studentRes] = await Promise.all([
-          fetch(`${API_URL}/auth/admin/me`,   { credentials: "include" }),
-          fetch(`${API_URL}/auth/student/me`, { credentials: "include" }),
+      const results = await Promise.allSettled([
+          fetch(`${API_URL}/auth/admin/me`,   { credentials: "include" }).catch(() => null),
+          fetch(`${API_URL}/auth/student/me`, { credentials: "include" }).catch(() => null),
         ]);
-        if (adminRes.ok)   setAdminUser(await adminRes.json());
-        if (studentRes.ok) setStudentUser(await studentRes.json());
-      } catch {
-        // Network errors — leave both null
-      } finally {
+        const [adminRes, studentRes] = results.map(r => r.value ?? null);
+        try { if (adminRes?.ok)   setAdminUser(await adminRes.json());   } catch { /**/ }
+        try { if (studentRes?.ok) setStudentUser(await studentRes.json()); } catch { /**/ }
         setSessionLoading(false);
-      }
     };
     restoreSessions();
   }, []);
@@ -99,12 +97,22 @@ export default function App() {
     return adminUser ? children : <Navigate to="/admin-login" replace />;
   };
 
+  // Logged-in student only — guests redirected to home
+  const StudentRoute = ({ children }) => {
+    if (sessionLoading) return null;
+    return studentUser ? children : <Navigate to="/" replace />;
+  };
+
   // ── Context value ──────────────────────────────────────────────────────────
+  const updateAdminUser  = (u) => setAdminUser(u);
+  const updateStudentUser = (u) => setStudentUser(u);
+
   const ctx = {
     adminUser, studentUser, API_URL,
     showToast,
     loginAdmin, logoutAdmin,
     loginStudent, logoutStudent,
+    updateAdminUser, updateStudentUser,
   };
 
   if (sessionLoading) {
@@ -159,8 +167,8 @@ export default function App() {
 
                 <li><NavLink to="/experiences">Experiences</NavLink></li>
 
-                {/* Share experience — visible to students and guests */}
-                {!adminUser && (
+                {/* Share experience — logged-in students only */}
+                {studentUser && (
                   <li><NavLink to="/submit-experience">Share Experience</NavLink></li>
                 )}
 
@@ -168,8 +176,19 @@ export default function App() {
                 {adminUser ? (
                   <>
                     <li>
+                      <span className="nav-link" style={{ display: "flex", alignItems: "center", cursor: "default", opacity: 0.85 }}>
+                        <Shield size={14} style={{ marginRight: 6 }} /> {adminUser.name?.split(" ")[0] || "Admin"}
+                      </span>
+                    </li>
+                    <li>
                       <Link to="/admin-dashboard" className="nav-link btn-admin" onClick={() => setMobileMenuOpen(false)}>
-                        <Shield size={14} style={{ marginRight: 6 }} /> Dashboard
+                        Dashboard
+                      </Link>
+                    </li>
+                    <li>
+                      <Link to="/admin-profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}
+                        style={{ display: "flex", alignItems: "center" }}>
+                        <User size={14} style={{ marginRight: 6 }} /> Profile
                       </Link>
                     </li>
                     <li>
@@ -186,9 +205,10 @@ export default function App() {
                   /* ── Student controls ── */
                   <>
                     <li>
-                      <span className="nav-link" style={{ display: "flex", alignItems: "center", cursor: "default", opacity: 0.8 }}>
+                      <Link to="/student-profile" className="nav-link" onClick={() => setMobileMenuOpen(false)}
+                        style={{ display: "flex", alignItems: "center" }}>
                         <User size={14} style={{ marginRight: 6 }} /> {studentUser.name?.split(" ")[0]}
-                      </span>
+                      </Link>
                     </li>
                     <li>
                       <button
@@ -236,17 +256,19 @@ export default function App() {
                 <Route path="/companies" element={<Companies />} />
                 <Route path="/companies/:id" element={<CompanyDetails />} />
                 <Route path="/experiences" element={<Experiences />} />
-                <Route path="/submit-experience" element={<SubmitExperience />} />
+                <Route path="/submit-experience" element={<StudentRoute><SubmitExperience /></StudentRoute>} />
 
                 {/* ── Admin routes ── */}
                 <Route path="/admin-login" element={<AdminLogin onLogin={loginAdmin} />} />
                 <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                <Route path="/admin-profile"   element={<AdminRoute><AdminProfile /></AdminRoute>} />
                 <Route path="/statistics"      element={<AdminRoute><Statistics /></AdminRoute>} />
 
                 {/* ── Student routes ── */}
                 <Route path="/student-login"    element={<StudentLogin    onLogin={loginStudent} />} />
                 <Route path="/student-register" element={<StudentRegister onLogin={loginStudent} />} />
                 <Route path="/verify-otp"       element={<OTPVerify       onLogin={loginStudent} />} />
+                <Route path="/student-profile"  element={<StudentProfile />} />
 
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

@@ -220,4 +220,41 @@ router.get("/me", authenticateAdmin, (req, res) => {
   return res.json({ id, email, name, role });
 });
 
+// ─────────────────────────────────────────────────────
+// PUT /api/auth/admin/me  — Update profile (name / password)
+// ─────────────────────────────────────────────────────
+router.put("/me", authenticateAdmin, async (req, res) => {
+  try {
+    const { name, currentPassword, newPassword } = req.body;
+    const admin = await Admin.findById(req.admin.id);
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+
+    if (name && name.trim()) {
+      admin.name = name.trim();
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters" });
+      }
+      if (!admin.password) {
+        return res.status(400).json({ message: "Cannot set password on a Google-only account" });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required to set a new password" });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, admin.password);
+      if (!isMatch) return res.status(401).json({ message: "Current password is incorrect" });
+      admin.password = await bcrypt.hash(newPassword, 12);
+    }
+
+    await admin.save();
+    const user = await issueAdminTokens(admin, res);
+    return res.json({ message: "Profile updated successfully", user });
+  } catch (err) {
+    console.error("Admin profile update error:", err);
+    return res.status(500).json({ message: "Server error updating profile" });
+  }
+});
+
 export default router;

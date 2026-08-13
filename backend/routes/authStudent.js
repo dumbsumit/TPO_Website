@@ -428,4 +428,41 @@ router.get("/me", authenticateStudent, (req, res) => {
   return res.json({ id, email, name, role, isVerified, branch, graduationYear });
 });
 
+// ─────────────────────────────────────────────────────
+// PUT /api/auth/student/me  — Update profile
+// ─────────────────────────────────────────────────────
+router.put("/me", authenticateStudent, async (req, res) => {
+  try {
+    const { name, branch, graduationYear, currentPassword, newPassword } = req.body;
+    const student = await Student.findById(req.student.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    if (name && name.trim())          student.name = name.trim();
+    if (branch !== undefined)          student.branch = branch;
+    if (graduationYear !== undefined)  student.graduationYear = graduationYear || null;
+
+    if (newPassword) {
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters" });
+      }
+      if (!student.password) {
+        return res.status(400).json({ message: "Cannot set password on a Google-only account" });
+      }
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required to change password" });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, student.password);
+      if (!isMatch) return res.status(401).json({ message: "Current password is incorrect" });
+      student.password = await bcrypt.hash(newPassword, 12);
+    }
+
+    await student.save();
+    const user = await issueStudentTokens(student, res);
+    return res.json({ message: "Profile updated successfully", user });
+  } catch (err) {
+    console.error("Student profile update error:", err);
+    return res.status(500).json({ message: "Server error updating profile" });
+  }
+});
+
 export default router;
