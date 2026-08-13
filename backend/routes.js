@@ -1,8 +1,10 @@
 import express from "express";
 import mongoose from "mongoose";
 import multer from "multer";
-import { Company, Experience, GlobalStats, Admin, YearlyStats } from "./models.js";
-import { parseCompaniesExcel, parseStatsExcel } from "./excelHelper.js";
+import xlsx from "xlsx";
+import { Company, Experience, GlobalStats, Admin, YearlyStats, PlacedStudent, PlacementOffer, Internship, PlacementRecord } from "./models.js";
+import { parseCompaniesExcel, parseStatsExcel, parsePlacementRecordsExcel } from "./excelHelper.js";
+import { authenticateAdmin } from "./middleware/auth.js";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -237,7 +239,7 @@ router.post("/admin/import-stats", authenticateAdmin, upload.single("file"), asy
 // --- NEW PLACEMENT RECORDS ENDPOINTS ---
 
 // 1. Bulk import placement records from Excel/CSV
-router.post("/admin/import-placement-records", authenticateToken, upload.single("file"), async (req, res) => {
+router.post("/admin/import-placement-records", authenticateAdmin, upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "Excel/CSV file is required" });
   }
@@ -279,7 +281,7 @@ router.post("/admin/import-placement-records", authenticateToken, upload.single(
 });
 
 // 2. Fetch paginated, filterable, and searchable list of placement records
-router.get("/admin/placement-records", authenticateToken, async (req, res) => {
+router.get("/admin/placement-records", authenticateAdmin, async (req, res) => {
   try {
     const { search, branch, gender, placementStatus, page = 1, limit = 20 } = req.query;
     const query = {};
@@ -341,7 +343,7 @@ router.get("/admin/placement-records", authenticateToken, async (req, res) => {
 });
 
 // 3. Aggregate student analytics for KPIs and Charts
-router.get("/admin/placement-records-analytics", authenticateToken, async (req, res) => {
+router.get("/admin/placement-records-analytics", authenticateAdmin, async (req, res) => {
   try {
     const totalStudents = await PlacementRecord.countDocuments({});
     
@@ -512,7 +514,7 @@ router.get("/admin/placement-records-analytics", authenticateToken, async (req, 
 });
 
 // 4. Bulk clear all student placement records
-router.delete("/admin/placement-records", authenticateToken, async (req, res) => {
+router.delete("/admin/placement-records", authenticateAdmin, async (req, res) => {
   try {
     await PlacementRecord.deleteMany({});
     res.json({ message: "All student placement records cleared successfully!" });
@@ -523,7 +525,7 @@ router.delete("/admin/placement-records", authenticateToken, async (req, res) =>
 });
 
 // 5. Delete individual student record
-router.delete("/admin/placement-records/:id", authenticateToken, async (req, res) => {
+router.delete("/admin/placement-records/:id", authenticateAdmin, async (req, res) => {
   try {
     const deleted = await PlacementRecord.findByIdAndDelete(req.params.id);
     if (!deleted) {
@@ -537,7 +539,7 @@ router.delete("/admin/placement-records/:id", authenticateToken, async (req, res
 });
 
 // 6. Update individual student record
-router.put("/admin/placement-records/:id", authenticateToken, async (req, res) => {
+router.put("/admin/placement-records/:id", authenticateAdmin, async (req, res) => {
   try {
     const updated = await PlacementRecord.findByIdAndUpdate(
       req.params.id,
@@ -554,7 +556,7 @@ router.put("/admin/placement-records/:id", authenticateToken, async (req, res) =
 });
 
 // --- EXCEL IMPORT FOR DETAILED PLACEMENT DATA ---
-router.post("/admin/import-placement-excel", authenticateToken, upload.single("file"), async (req, res) => {
+router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: "Excel/CSV file is required" });
   }
@@ -884,7 +886,7 @@ const calculateMedianVal = (arr) => {
 };
 
 // 1. Dashboard Summary API
-router.get("/admin/dashboard-summary", authenticateToken, async (req, res) => {
+router.get("/admin/dashboard-summary", authenticateAdmin, async (req, res) => {
   try {
     const totalStudents = await PlacedStudent.countDocuments({});
     
@@ -936,7 +938,7 @@ router.get("/admin/dashboard-summary", authenticateToken, async (req, res) => {
 });
 
 // 2. Student Placement List API (Paginated, Searchable, Filterable)
-router.get("/admin/students", authenticateToken, async (req, res) => {
+router.get("/admin/students", authenticateAdmin, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -998,7 +1000,7 @@ router.get("/admin/students", authenticateToken, async (req, res) => {
 });
 
 // 3. Student Details API
-router.get("/admin/students/:id", authenticateToken, async (req, res) => {
+router.get("/admin/students/:id", authenticateAdmin, async (req, res) => {
   try {
     const student = await PlacedStudent.findById(req.params.id).lean();
     if (!student) {
@@ -1034,7 +1036,7 @@ router.get("/admin/students/:id", authenticateToken, async (req, res) => {
 });
 
 // 4. Update Student Details API (with associated Offers/Internships)
-router.put("/admin/students/:id", authenticateToken, async (req, res) => {
+router.put("/admin/students/:id", authenticateAdmin, async (req, res) => {
   try {
     const { name, branch, gender, personalEmail, collegeEmail, phone, offers, internships } = req.body;
 
@@ -1121,7 +1123,7 @@ router.put("/admin/students/:id", authenticateToken, async (req, res) => {
 });
 
 // 5. Delete Student API (with associated Offers/Internships)
-router.delete("/admin/students/:id", authenticateToken, async (req, res) => {
+router.delete("/admin/students/:id", authenticateAdmin, async (req, res) => {
   try {
     const student = await PlacedStudent.findByIdAndDelete(req.params.id);
     if (!student) {
@@ -1138,7 +1140,7 @@ router.delete("/admin/students/:id", authenticateToken, async (req, res) => {
 });
 
 // 6. Company-wise Statistics API
-router.get("/admin/companies-stats", authenticateToken, async (req, res) => {
+router.get("/admin/companies-stats", authenticateAdmin, async (req, res) => {
   try {
     const companies = await Company.find({});
     const stats = [];
@@ -1185,7 +1187,7 @@ router.get("/admin/companies-stats", authenticateToken, async (req, res) => {
 });
 
 // 7. Branch-wise Statistics API
-router.get("/admin/branches-stats", authenticateToken, async (req, res) => {
+router.get("/admin/branches-stats", authenticateAdmin, async (req, res) => {
   try {
     const students = await PlacedStudent.find({});
     const branches = [...new Set(students.map(s => s.branch))];
@@ -1230,7 +1232,7 @@ router.get("/admin/branches-stats", authenticateToken, async (req, res) => {
 });
 
 // 8. Package Statistics API
-router.get("/admin/packages-stats", authenticateToken, async (req, res) => {
+router.get("/admin/packages-stats", authenticateAdmin, async (req, res) => {
   try {
     const offers = await PlacementOffer.find({});
     const packages = offers
@@ -1273,7 +1275,7 @@ router.get("/admin/packages-stats", authenticateToken, async (req, res) => {
 });
 
 // 9. Internship Statistics API
-router.get("/admin/internships-stats", authenticateToken, async (req, res) => {
+router.get("/admin/internships-stats", authenticateAdmin, async (req, res) => {
   try {
     const internships = await Internship.find({}).populate("studentId");
     
@@ -1313,7 +1315,7 @@ router.get("/admin/internships-stats", authenticateToken, async (req, res) => {
 });
 
 // 10. Multiple-Offer Statistics API
-router.get("/admin/multiple-offers-stats", authenticateToken, async (req, res) => {
+router.get("/admin/multiple-offers-stats", authenticateAdmin, async (req, res) => {
   try {
     const multipleOffersAgg = await PlacementOffer.aggregate([
       { $group: { _id: "$studentId", count: { $sum: 1 } } },
@@ -1349,7 +1351,7 @@ router.get("/admin/multiple-offers-stats", authenticateToken, async (req, res) =
 });
 
 // 11. Excel Export API
-router.get("/admin/export-placement-excel", authenticateToken, async (req, res) => {
+router.get("/admin/export-placement-excel", authenticateAdmin, async (req, res) => {
   try {
     const students = await PlacedStudent.find({}).lean();
     const rows = [];
