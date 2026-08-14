@@ -2,8 +2,8 @@ import express from "express";
 import mongoose from "mongoose";
 import multer from "multer";
 import xlsx from "xlsx";
-import { Company, Experience, GlobalStats, Admin, YearlyStats, PlacedStudent, PlacementOffer, Internship, PlacementRecord } from "./models.js";
-import { parseCompaniesExcel, parseStatsExcel, parsePlacementRecordsExcel } from "./excelHelper.js";
+import { Company, Experience, GlobalStats, Admin, YearlyStats, PlacedStudent, PlacementOffer, Internship, PlacementRecord, BranchConfig } from "./models.js";
+import { parseCompaniesExcel, parsePlacementRecordsExcel } from "./excelHelper.js";
 import { authenticateAdmin } from "./middleware/auth.js";
 
 const router = express.Router();
@@ -189,6 +189,52 @@ router.put("/statistics", authenticateAdmin, async (req, res) => {
   } catch { res.status(400).json({ message: "Error updating statistics" }); }
 });
 
+// --- BRANCH CONFIG (registered student counts per branch) ---
+
+// GET all branch configs
+router.get("/admin/branch-config", authenticateAdmin, async (req, res) => {
+  try {
+    const configs = await BranchConfig.find({}).sort({ branch: 1 });
+    res.json(configs);
+  } catch {
+    res.status(500).json({ message: "Failed to fetch branch configs" });
+  }
+});
+
+// POST upsert one branch config
+router.post("/admin/branch-config", authenticateAdmin, async (req, res) => {
+  const { branch, registeredCount } = req.body;
+  if (!branch || registeredCount === undefined || registeredCount === null) {
+    return res.status(400).json({ message: "branch and registeredCount are required" });
+  }
+  const count = Number(registeredCount);
+  if (isNaN(count) || count < 0) {
+    return res.status(400).json({ message: "registeredCount must be a non-negative number" });
+  }
+  try {
+    const config = await BranchConfig.findOneAndUpdate(
+      { branch: branch.trim() },
+      { branch: branch.trim(), registeredCount: count },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.json({ message: "Branch config saved", config });
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ message: "Branch already exists" });
+    res.status(500).json({ message: "Failed to save branch config" });
+  }
+});
+
+// DELETE one branch config
+router.delete("/admin/branch-config/:branch", authenticateAdmin, async (req, res) => {
+  try {
+    const deleted = await BranchConfig.findOneAndDelete({ branch: decodeURIComponent(req.params.branch) });
+    if (!deleted) return res.status(404).json({ message: "Branch config not found" });
+    res.json({ message: "Branch config deleted" });
+  } catch {
+    res.status(500).json({ message: "Failed to delete branch config" });
+  }
+});
+
 // --- EXCEL BULK IMPORTS ---
 router.post("/admin/import-companies", authenticateAdmin, upload.single("file"), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: "Excel file is required" });
@@ -211,28 +257,6 @@ router.post("/admin/import-companies", authenticateAdmin, upload.single("file"),
   } catch (error) {
     console.error("Excel import error:", error);
     res.status(500).json({ message: "Failed to parse Excel file", error: error.message });
-  }
-});
-
-router.post("/admin/import-stats", authenticateAdmin, upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: "Excel file is required" });
-  try {
-    const parsed = parseStatsExcel(req.file.buffer);
-    if (parsed.length === 0) {
-      return res.status(400).json({ message: "No valid statistics rows found" });
-    }
-
-    let insertedCount = 0, updatedCount = 0;
-    for (const statData of parsed) {
-      const match = await YearlyStats.findOne({ year: statData.year });
-      if (match) { await YearlyStats.findByIdAndUpdate(match._id, statData); updatedCount++; }
-      else { await new YearlyStats(statData).save(); insertedCount++; }
-    }
-    await recalculateGlobalStats();
-    res.json({ message: "Placement Statistics Excel imported successfully!", inserted: insertedCount, updated: updatedCount, totalProcessed: parsed.length });
-  } catch (error) {
-    console.error("Stats import error:", error);
-    res.status(500).json({ message: "Failed to parse statistics Excel file", error: error.message });
   }
 });
 
@@ -569,16 +593,6 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
 
     if (rows.length === 0) {
       return res.status(400).json({ message: "The uploaded sheet is empty." });
-    }
-
-    // Cross-check if the file looks like yearly statistics instead of student records
-    if (rows.length > 0) {
-      const firstRowKeys = Object.keys(rows[0]).map(k => k.trim().toLowerCase());
-      if (firstRowKeys.includes("year") && !firstRowKeys.includes("prn") && !firstRowKeys.includes("first name")) {
-        return res.status(400).json({ 
-          message: "This file appears to contain Yearly Placement Statistics. Please upload it in the 'Bulk Import Yearly Placements Stats Summary' section above instead." 
-        });
-      }
     }
 
     let totalRows = rows.length;

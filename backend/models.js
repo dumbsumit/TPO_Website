@@ -151,3 +151,11 @@ const PlacementRecordSchema = new mongoose.Schema({
 
 export const PlacementRecord = mongoose.model("PlacementRecord", PlacementRecordSchema);
 
+// ─── BranchConfig (registered student counts per branch) ─────────────────────
+const BranchConfigSchema = new mongoose.Schema({
+  branch:          { type: String, required: true, unique: true, trim: true },
+  registeredCount: { type: Number, required: true, default: 0 },
+}, { timestamps: true });
+
+export const BranchConfig = mongoose.model("BranchConfig", BranchConfigSchema);
+

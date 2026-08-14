@@ -5,8 +5,8 @@ import { useCallback } from "react";
 import { 
   Upload, FileSpreadsheet, Trash2, Check, 
   Award, ShieldCheck, Download, FileText,
-  TrendingUp, Edit2, Search, X, ShieldAlert,
-  User, Mail, Phone, Calendar, Eye, Layers,
+  TrendingUp, Edit2, Search, X, Plus, Save, CheckCircle,
+  User, Mail, Phone, Eye, Layers,
   Briefcase, MessageSquare
 } from "lucide-react";
 import {
@@ -39,26 +39,142 @@ export default function AdminDashboard() {
   const [importResult, setImportResult] = useState(null);
 
   // Excel Upload Refs
-  const statsFileRef = useRef(null);
-  const [statsFileName, setStatsFileName] = useState("");
   const placementFileRef = useRef(null);
   const [placementFileName, setPlacementFileName] = useState("");
+
+  // Branch Config state
+  const [branchConfigs, setBranchConfigs] = useState([]);      // [{branch, registeredCount, _id}]
+  const [branchEdits, setBranchEdits]   = useState({});        // {_id|branch -> editedCount}
+  const [branchSaving, setBranchSaving] = useState({});        // {branch -> bool}
+  const [newBranch, setNewBranch]       = useState("");         // dropdown value
+  const [newBranchCustom, setNewBranchCustom] = useState("");  // typed custom branch
+  const [newCount, setNewCount]         = useState("");
+  const [branchAdding, setBranchAdding] = useState(false);
+
+  const KNOWN_BRANCHES = ["CSE", "ENTC", "MECH", "CIVIL", "EE", "IT", "INSTRU", "Other"];
 
   // Fetch dashboard data
   const loadDashboardData = useCallback(async () => {
     try {
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      const expRes = await axios.get(`${API_URL}/experiences/admin`, authHeaders);
+      const expRes = await axios.get(`${API_URL}/experiences/admin`, { withCredentials: true });
       setExperiences(expRes.data || []);
     } catch (err) {
       console.error("Dashboard fetching error:", err);
       showToast("Failed to fetch dashboard updates", "error");
     }
-  }, [API_URL, token, showToast]);
+  }, [API_URL, showToast]);
+
+  // Load branch configs
+  const loadBranchConfigs = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/admin/branch-config`, {
+        withCredentials: true
+      });
+      const configs = res.data || [];
+      setBranchConfigs(configs);
+      const edits = {};
+      configs.forEach(c => { edits[c.branch] = c.registeredCount; });
+      setBranchEdits(edits);
+    } catch {
+      showToast("Failed to load branch configurations", "error");
+    }
+  }, [API_URL, showToast]);
+
+  // Save (upsert) one branch config
+  const saveBranchConfig = async (branch, count) => {
+    const parsed = Number(count);
+    if (!branch || isNaN(parsed) || parsed < 0) {
+      showToast("Enter a valid branch name and a non-negative count", "error");
+      return;
+    }
+    setBranchSaving(prev => ({ ...prev, [branch]: true }));
+    try {
+      await axios.post(
+        `${API_URL}/admin/branch-config`,
+        { branch, registeredCount: parsed },
+        { withCredentials: true }
+      );
+      showToast(`Saved: ${branch} → ${parsed} registered`, "success");
+      await loadBranchConfigs();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to save branch config", "error");
+    } finally {
+      setBranchSaving(prev => ({ ...prev, [branch]: false }));
+    }
+  };
+
+  // Delete one branch config
+  const deleteBranchConfig = async (branch) => {
+    if (!window.confirm(`Delete branch config for "${branch}"?`)) return;
+    try {
+      await axios.delete(
+        `${API_URL}/admin/branch-config/${encodeURIComponent(branch)}`,
+        { withCredentials: true }
+      );
+      showToast(`Deleted config for ${branch}`, "success");
+      await loadBranchConfigs();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to delete branch config", "error");
+    }
+  };
+
+  // Add new branch
+  const handleAddBranch = async () => {
+    const branchName = (newBranch === "Other" ? newBranchCustom : newBranch).trim();
+    if (!branchName) { showToast("Please select or enter a branch name", "error"); return; }
+    const parsed = Number(newCount);
+    if (isNaN(parsed) || parsed < 0) { showToast("Enter a valid non-negative count", "error"); return; }
+    // Check duplicate
+    if (branchConfigs.some(c => c.branch.toLowerCase() === branchName.toLowerCase())) {
+      showToast(`Branch "${branchName}" already exists. Edit it directly in the table.`, "error");
+      return;
+    }
+    setBranchAdding(true);
+    try {
+      await axios.post(
+        `${API_URL}/admin/branch-config`,
+        { branch: branchName, registeredCount: parsed },
+        { withCredentials: true }
+      );
+      showToast(`Added: ${branchName} → ${parsed} registered`, "success");
+      setNewBranch(""); setNewBranchCustom(""); setNewCount("");
+      await loadBranchConfigs();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to add branch", "error");
+    } finally {
+      setBranchAdding(false);
+    }
+  };
+
+  // Finalize & Verify submission
+  const handleFinalizeSubmission = async () => {
+    setLoading(true);
+    try {
+      for (const cfg of branchConfigs) {
+        const edited = branchEdits[cfg.branch];
+        if (edited !== undefined && Number(edited) !== cfg.registeredCount) {
+          await axios.post(
+            `${API_URL}/admin/branch-config`,
+            { branch: cfg.branch, registeredCount: Number(edited) },
+            { withCredentials: true }
+          );
+        }
+      }
+      await loadBranchConfigs();
+      await loadDashboardData();
+      showToast("Spreadsheet data & branch registered counts verified and saved! Analysis complete.", "success");
+    } catch (err) {
+      console.error("Submission error:", err);
+      showToast("Failed to complete data verification.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadDashboardData();
-  }, [loadDashboardData]);
+    loadBranchConfigs();
+  }, [loadDashboardData, loadBranchConfigs]);
 
   // Helper to generate template download links
   const downloadTemplate = () => {
@@ -101,8 +217,7 @@ export default function AdminDashboard() {
   // --- REVIEW EXPERIENCES IMPLEMENTATIONS ---
   const updateExpStatus = async (expId, status) => {
     try {
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.patch(`${API_URL}/experiences/${expId}/status`, { status }, authHeaders);
+      await axios.patch(`${API_URL}/experiences/${expId}/status`, { status }, { withCredentials: true });
       showToast(`Experience updated to: ${status.toUpperCase()}`);
       loadDashboardData();
     } catch (err) {
@@ -114,8 +229,7 @@ export default function AdminDashboard() {
   const deleteExperience = async (expId) => {
     if (!window.confirm("Are you sure you want to delete this submission?")) return;
     try {
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.delete(`${API_URL}/experiences/${expId}`, authHeaders);
+      await axios.delete(`${API_URL}/experiences/${expId}`, { withCredentials: true });
       showToast("Submission deleted.");
       loadDashboardData();
     } catch (err) {
@@ -173,22 +287,10 @@ export default function AdminDashboard() {
               <Award size={16} /> Branch Analytics
             </li>
             <li 
-              className={`sidebar-item ${activeTab === "internships" ? "active" : ""}`}
-              onClick={() => setActiveTab("internships")}
-            >
-              <Calendar size={16} /> Internship Analytics
-            </li>
-            <li 
               className={`sidebar-item ${activeTab === "reports" ? "active" : ""}`}
               onClick={() => setActiveTab("reports")}
             >
               <FileText size={16} /> Reports Generator
-            </li>
-            <li 
-              className={`sidebar-item ${activeTab === "quality" ? "active" : ""}`}
-              onClick={() => setActiveTab("quality")}
-            >
-              <ShieldAlert size={16} /> Data Quality
             </li>
             <li 
               className={`sidebar-item ${activeTab === "experiences" ? "active" : ""}`}
@@ -210,68 +312,6 @@ export default function AdminDashboard() {
                 <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
                   Upload Excel or CSV files for yearly placement figures. The database automatically parses rows and updates the portal statistics.
                 </p>
-              </div>
-
-              {/* Stats Import */}
-              <div style={{ border: "1px solid var(--border-color)", padding: 24, borderRadius: "var(--radius-md)", background: "rgba(255,255,255,0.01)", marginBottom: 24 }}>
-                <h3 style={{ fontSize: 16, marginBottom: 12, display: "flex", alignItems: "center", justifyItems: "center", gap: 8 }}>
-                  <Award size={16} style={{ color: "var(--accent)" }} /> Bulk Import Yearly Placements Stats Summary
-                </h3>
-                
-                <div 
-                  className="excel-dropzone" 
-                  onClick={() => statsFileRef.current?.click()}
-                >
-                  <Upload className="excel-dropzone-icon" size={32} style={{ color: "var(--accent)" }} />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                      {statsFileName || "Drag & Drop or Click to Select Statistics Excel"}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                      Supports columns: Year, Total Companies Visited, Total Placed, Average Package.
-                    </div>
-                  </div>
-                  <input
-                    type="file"
-                    ref={statsFileRef}
-                    style={{ display: "none" }}
-                    accept=".xlsx, .xls, .csv"
-                    onChange={async (e) => {
-                      const file = e.target.files[0];
-                      if (!file) return;
-
-                      setStatsFileName(file.name);
-
-                      const formData = new FormData();
-                      formData.append("file", file);
-
-                      setLoading(true);
-                      try {
-                        const response = await axios.post(
-                          `${API_URL}/admin/import-stats`,
-                          formData,
-                          {
-                            headers: {
-                              "Content-Type": "multipart/form-data",
-                              Authorization: `Bearer ${token}`
-                            }
-                          }
-                        );
-
-                        showToast(response.data.message || "File imported successfully", "success");
-                        loadDashboardData();
-                        setStatsFileName("");
-                        if (statsFileRef.current) statsFileRef.current.value = "";
-                      } catch (err) {
-                        console.error("Import error:", err);
-                        showToast(err.response?.data?.message || "Failed to process spreadsheet file.", "error");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading}
-                  />
-                </div>
               </div>
 
               {/* Detailed Placement Records Import */}
@@ -313,16 +353,15 @@ export default function AdminDashboard() {
                           `${API_URL}/admin/import-placement-excel`,
                           formData,
                           {
+                            withCredentials: true,
                             headers: {
-                              "Content-Type": "multipart/form-data",
-                              Authorization: `Bearer ${token}`
+                              "Content-Type": "multipart/form-data"
                             }
                           }
                         );
 
-                        showToast("Spreadsheet upload processed successfully!", "success");
+                        showToast("Spreadsheet uploaded & processed! Review branch counts below.", "success");
                         setImportResult(response.data);
-                        setPlacementFileName("");
                         if (placementFileRef.current) placementFileRef.current.value = "";
                       } catch (err) {
                         console.error("Student records import error:", err);
@@ -343,6 +382,180 @@ export default function AdminDashboard() {
                 >
                   <Download size={14} style={{ marginRight: 6 }} /> Download Detailed Placement Records CSV Template
                 </button>
+
+                {/* ── Summary & Branch Registered Students Config & Submit (shown after upload) ── */}
+                {importResult && (
+                  <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+                    {/* 1. Upload Result Summary */}
+                    <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: 20, background: "rgba(16,185,129,0.04)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <CheckCircle size={18} style={{ color: "var(--success)" }} />
+                          <h4 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Spreadsheet Ingestion Summary</h4>
+                        </div>
+                        <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 12, background: "rgba(16,185,129,0.15)", color: "var(--success)", fontWeight: 600 }}>
+                          Sheet Uploaded Successfully
+                        </span>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+                        <div style={{ background: "var(--bg-secondary)", padding: 12, borderRadius: "var(--radius-sm)", textAlign: "center" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Total Rows</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{importResult.summary?.totalRows || 0}</div>
+                        </div>
+                        <div style={{ background: "var(--bg-secondary)", padding: 12, borderRadius: "var(--radius-sm)", textAlign: "center" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>New Records</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--success)", marginTop: 2 }}>{importResult.summary?.successfullyImported || 0}</div>
+                        </div>
+                        <div style={{ background: "var(--bg-secondary)", padding: 12, borderRadius: "var(--radius-sm)", textAlign: "center" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Updated Records</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--accent)", marginTop: 2 }}>{importResult.summary?.updatedRecords || 0}</div>
+                        </div>
+                        <div style={{ background: "var(--bg-secondary)", padding: 12, borderRadius: "var(--radius-sm)", textAlign: "center" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Duplicates</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--warning)", marginTop: 2 }}>{importResult.summary?.duplicateRecords || 0}</div>
+                        </div>
+                        {importResult.summary?.failedRecords > 0 && (
+                          <div style={{ background: "var(--bg-secondary)", padding: 12, borderRadius: "var(--radius-sm)", textAlign: "center" }}>
+                            <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>Failed Rows</div>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--danger)", marginTop: 2 }}>{importResult.summary?.failedRecords}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 2. Branch Registered Students Count Config Editor */}
+                    <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--bg-secondary)" }}>
+                      <div style={{ padding: "14px 20px", background: "rgba(99,102,241,0.08)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: 10 }}>
+                        <Layers size={16} style={{ color: "var(--accent)" }} />
+                        <div>
+                          <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Set / Edit Branch Registered Students Count</h3>
+                          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                            Set total registered students per branch for placement % calculations. Add new branches if needed.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Existing entries table */}
+                      <div style={{ padding: "0 20px" }}>
+                        {branchConfigs.length === 0 ? (
+                          <p style={{ color: "var(--text-muted)", fontSize: 13, padding: "18px 0", textAlign: "center" }}>
+                            No branch configurations yet. Add one below.
+                          </p>
+                        ) : (
+                          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                                <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.06em", width: "40%" }}>Branch</th>
+                                <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.06em", width: "35%" }}>Registered Count</th>
+                                <th style={{ width: "25%" }}></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {branchConfigs.map(cfg => (
+                                <tr key={cfg.branch} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                  <td style={{ padding: "9px 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                                    {cfg.branch}
+                                  </td>
+                                  <td style={{ padding: "9px 8px 9px 0" }}>
+                                    <input
+                                      type="number" min="0"
+                                      className="form-input"
+                                      style={{ width: 110, height: 32, fontSize: 13, padding: "4px 10px" }}
+                                      value={branchEdits[cfg.branch] ?? cfg.registeredCount}
+                                      onChange={e => setBranchEdits(prev => ({ ...prev, [cfg.branch]: e.target.value }))}
+                                    />
+                                  </td>
+                                  <td style={{ padding: "9px 0", textAlign: "right" }}>
+                                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        style={{ height: 30, fontSize: 12, padding: "0 10px", display: "flex", alignItems: "center", gap: 4 }}
+                                        disabled={branchSaving[cfg.branch]}
+                                        onClick={() => saveBranchConfig(cfg.branch, branchEdits[cfg.branch] ?? cfg.registeredCount)}
+                                      >
+                                        <Save size={11} />
+                                        {branchSaving[cfg.branch] ? "Saving…" : "Save"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-danger"
+                                        style={{ height: 30, fontSize: 12, padding: "0 8px", display: "flex", alignItems: "center", gap: 4 }}
+                                        onClick={() => deleteBranchConfig(cfg.branch)}
+                                      >
+                                        <Trash2 size={11} /> Delete
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+
+                      {/* Add new branch */}
+                      <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border-color)", background: "rgba(0,0,0,0.1)" }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Add New Branch</p>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Branch</label>
+                            <select
+                              className="form-input"
+                              style={{ height: 34, fontSize: 13, minWidth: 120 }}
+                              value={newBranch}
+                              onChange={e => { setNewBranch(e.target.value); if (e.target.value !== "Other") setNewBranchCustom(""); }}
+                            >
+                              <option value="">-- Select --</option>
+                              {KNOWN_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                          </div>
+                          {newBranch === "Other" && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Custom Name</label>
+                              <input type="text" className="form-input" placeholder="e.g. PROD"
+                                style={{ height: 34, fontSize: 13, width: 120 }}
+                                value={newBranchCustom} onChange={e => setNewBranchCustom(e.target.value)}
+                              />
+                            </div>
+                          )}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Registered Count</label>
+                            <input type="number" min="0" className="form-input" placeholder="e.g. 120"
+                              style={{ height: 34, fontSize: 13, width: 110 }}
+                              value={newCount} onChange={e => setNewCount(e.target.value)}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ height: 34, fontSize: 13, padding: "0 14px", display: "flex", alignItems: "center", gap: 6 }}
+                            disabled={branchAdding || !newBranch || (newBranch === "Other" && !newBranchCustom.trim()) || newCount === ""}
+                            onClick={handleAddBranch}
+                          >
+                            <Plus size={13} />
+                            {branchAdding ? "Adding…" : "Add Branch"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Submit & Verify Button */}
+                    <div style={{ textAlign: "right" }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ height: 44, fontSize: 14, padding: "0 24px", display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", fontWeight: 600, boxShadow: "0 4px 12px rgba(99,102,241,0.25)" }}
+                        onClick={handleFinalizeSubmission}
+                        disabled={loading}
+                      >
+                        <CheckCircle size={18} />
+                        Verify & Submit Data for Placement Analysis
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -367,19 +580,9 @@ export default function AdminDashboard() {
             <AdminBranchAnalytics />
           )}
 
-          {/* TAB 6: INTERNSHIP ANALYTICS */}
-          {activeTab === "internships" && (
-            <AdminInternshipAnalytics />
-          )}
-
-          {/* TAB 7: REPORTS GENERATOR */}
+          {/* TAB 6: REPORTS GENERATOR */}
           {activeTab === "reports" && (
             <AdminReports />
-          )}
-
-          {/* TAB 8: DATA QUALITY AUDITOR */}
-          {activeTab === "quality" && (
-            <AdminDataQuality />
           )}
 
           {/* TAB 9: REVIEW INTERVIEW EXPERIENCES */}
@@ -827,7 +1030,7 @@ function AdminPlacementAnalytics() {
   const hasData = totalStudents > 0;
 
   const formatLPA = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
+    if (val === null || val === undefined || isNaN(val)) return "â€”";
     return `${parseFloat(Number(val).toFixed(2))} LPA`;
   };
 
@@ -1069,7 +1272,7 @@ function AdminPlacementAnalytics() {
         prn: s.prn,
         branch: s.branch,
         gender: s.gender,
-        companyName: "—",
+        companyName: "â€”",
         packageLpa: null,
         status: "Unplaced"
       });
@@ -1720,7 +1923,7 @@ function AdminPlacementAnalytics() {
                 </div>
                 <div className="form-row-2col" style={{ marginTop: 12 }}>
                   <div className="form-group">
-                    <label>Internship Stipend (₹/month)</label>
+                    <label>Internship Stipend (â‚¹/month)</label>
                     <input
                       type="number"
                       className="form-control"
@@ -1969,7 +2172,7 @@ function AdminCompanyAnalytics() {
   }).sort((a, b) => b.totalStudents - a.totalStudents);
 
   const formatLPA = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
+    if (val === null || val === undefined || isNaN(val)) return "â€”";
     return `${parseFloat(Number(val).toFixed(2))} LPA`;
   };
 
@@ -2049,7 +2252,7 @@ function AdminCompanyAnalytics() {
             className="btn btn-secondary"
             style={{ padding: "6px 12px", fontSize: 12, marginBottom: 12 }}
           >
-            ← Back to Companies List
+            â† Back to Companies List
           </button>
           <h2 style={{ fontSize: 24, fontWeight: 700, color: "var(--primary)" }}>{comp.companyName} Analytics</h2>
           <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4 }}>
@@ -2230,16 +2433,16 @@ function AdminCompanyAnalytics() {
                                   <strong>{o.offerType} Offer</strong>: {formatLPA(o.packageLpa)}
                                 </div>
                               ))
-                            ) : "—"}
+                            ) : "â€”"}
                           </td>
                           <td>
                             {student.internships && student.internships.length > 0 ? (
                               student.internships.map((i, iIdx) => (
                                 <div key={iIdx}>
-                                  <strong>Intern</strong>: {i.stipend ? `₹${i.stipend.toLocaleString()}/mo` : "Yes"} (PPO: {i.ppo})
+                                  <strong>Intern</strong>: {i.stipend ? `â‚¹${i.stipend.toLocaleString()}/mo` : "Yes"} (PPO: {i.ppo})
                                 </div>
                               ))
-                            ) : "—"}
+                            ) : "â€”"}
                           </td>
                         </tr>
                       );
@@ -2491,7 +2694,7 @@ function AdminBranchAnalytics() {
   }).sort((a, b) => b.totalStudents - a.totalStudents);
 
   const formatLPA = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
+    if (val === null || val === undefined || isNaN(val)) return "â€”";
     return `${parseFloat(Number(val).toFixed(2))} LPA`;
   };
 
@@ -2689,335 +2892,6 @@ function AdminBranchAnalytics() {
 
         </div>
       )}
-
-    </div>
-  );
-}
-
-function AdminInternshipAnalytics() {
-  const { token, API_URL, showToast } = useAppContext();
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Pagination states
-  const [internshipsPage, setInternshipsPage] = useState(1);
-  const [companiesPage, setCompaniesPage] = useState(1);
-  const itemsPerPage = 5;
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      const res = await axios.get(`${API_URL}/admin/students`, {
-        headers: authHeaders.headers,
-        params: { limit: 100000 }
-      });
-      setStudents(res.data.students || []);
-    } catch (err) {
-      console.error("Error loading internship analytics:", err);
-      showToast("Failed to fetch internship records", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [API_URL, token, showToast]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Aggregate internship stats dynamically
-  const internshipList = [];
-  const stipendList = [];
-  const companyInternMap = {};
-  let ppoCount = 0;
-
-  students.forEach(s => {
-    s.internships?.forEach(i => {
-      internshipList.push({
-        studentName: s.name,
-        branch: s.branch,
-        companyName: i.companyName || "—",
-        startDate: i.startDate || null,
-        endDate: i.endDate || null,
-        stipend: i.stipend !== undefined && i.stipend !== null ? i.stipend : null,
-        ppo: i.ppo || "No",
-        status: i.status || "Active"
-      });
-
-      if (typeof i.stipend === "number") {
-        stipendList.push(i.stipend);
-      }
-
-      if (i.ppo === "Yes") {
-        ppoCount++;
-      }
-
-      const company = (i.companyName || "Unknown").trim();
-      if (!companyInternMap[company]) {
-        companyInternMap[company] = {
-          name: company,
-          internsCount: 0,
-          stipends: [],
-          ppoCount: 0
-        };
-      }
-      const comp = companyInternMap[company];
-      comp.internsCount++;
-      if (typeof i.stipend === "number") {
-        comp.stipends.push(i.stipend);
-      }
-      if (i.ppo === "Yes") {
-        comp.ppoCount++;
-      }
-    });
-  });
-
-  const totalInternships = internshipList.length;
-  const averageStipend = stipendList.length > 0 ? (stipendList.reduce((a, b) => a + b, 0) / stipendList.length) : null;
-  const highestStipend = stipendList.length > 0 ? Math.max(...stipendList) : null;
-  const uniqueCompaniesCount = Object.keys(companyInternMap).length;
-
-  const companyAnalyticsList = Object.keys(companyInternMap).map(name => {
-    const comp = companyInternMap[name];
-    const avg = comp.stipends.length > 0 ? (comp.stipends.reduce((a,b) => a+b, 0) / comp.stipends.length) : null;
-    const max = comp.stipends.length > 0 ? Math.max(...comp.stipends) : null;
-    return {
-      companyName: name,
-      internsCount: comp.internsCount,
-      averageStipend: avg,
-      highestStipend: max,
-      ppoCount: comp.ppoCount
-    };
-  }).sort((a, b) => b.internsCount - a.internsCount);
-
-  // Formatting helpers
-  const formatStipend = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
-    return `₹${parseFloat(Number(val).toFixed(2)).toLocaleString()}/mo`;
-  };
-
-  const formatDate = (val) => {
-    if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-  };
-
-  // Paginated lists
-  const intPages = Math.ceil(totalInternships / itemsPerPage);
-  const paginatedInternships = internshipList.slice((internshipsPage - 1) * itemsPerPage, internshipsPage * itemsPerPage);
-
-  const compTotal = companyAnalyticsList.length;
-  const compPages = Math.ceil(compTotal / itemsPerPage);
-  const paginatedCompanies = companyAnalyticsList.slice((companiesPage - 1) * itemsPerPage, companiesPage * itemsPerPage);
-
-  if (loading) {
-    return <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 60 }}>Loading internship analytics...</div>;
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
-      
-      {/* KPIs Grid */}
-      <div className="wce-stats-grid" style={{ margin: 0, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-        <div className="wce-stat-card">
-          <div className="wce-stat-icon-wrapper" style={{ color: "var(--primary)", background: "var(--primary-glow)" }}>
-            <FileText size={20} />
-          </div>
-          <div className="wce-stat-info">
-            <h3>{totalInternships}</h3>
-            <p>Total Internships</p>
-          </div>
-        </div>
-
-        <div className="wce-stat-card">
-          <div className="wce-stat-icon-wrapper" style={{ color: "var(--success)", background: "rgba(16, 185, 129, 0.08)" }}>
-            <Award size={20} />
-          </div>
-          <div className="wce-stat-info">
-            <h3>{formatStipend(averageStipend)}</h3>
-            <p>Average Stipend</p>
-          </div>
-        </div>
-
-        <div className="wce-stat-card">
-          <div className="wce-stat-icon-wrapper" style={{ color: "var(--accent)", background: "var(--accent-glow)" }}>
-            <TrendingUp size={20} />
-          </div>
-          <div className="wce-stat-info">
-            <h3>{formatStipend(highestStipend)}</h3>
-            <p>Highest Stipend</p>
-          </div>
-        </div>
-
-        <div className="wce-stat-card">
-          <div className="wce-stat-icon-wrapper" style={{ color: "var(--secondary)", background: "rgba(138, 63, 252, 0.08)" }}>
-            <Briefcase size={20} />
-          </div>
-          <div className="wce-stat-info">
-            <h3>{uniqueCompaniesCount}</h3>
-            <p>Internship Companies</p>
-          </div>
-        </div>
-
-        <div className="wce-stat-card">
-          <div className="wce-stat-icon-wrapper" style={{ color: "var(--success)", background: "rgba(16, 185, 129, 0.08)" }}>
-            <Check size={20} />
-          </div>
-          <div className="wce-stat-info">
-            <h3>{ppoCount}</h3>
-            <p>PPO Count</p>
-          </div>
-        </div>
-
-        <div className="wce-stat-card">
-          <div className="wce-stat-icon-wrapper" style={{ color: "var(--accent)", background: "var(--accent-glow)" }}>
-            <Check size={20} />
-          </div>
-          <div className="wce-stat-info">
-            <h3>{ppoCount}</h3>
-            <p>Internship + PPO Count</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tables Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(450px, 1fr))", gap: 30 }}>
-        
-        {/* Internships Registry Table */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <h3 style={{ fontSize: 18, borderBottom: "1px solid var(--border-color)", paddingBottom: 12, margin: 0 }}>Internships Registry</h3>
-          
-          {paginatedInternships.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>No internship records found.</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1 }}>
-              <div className="table-container" style={{ flex: 1 }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Student</th>
-                      <th>Branch</th>
-                      <th>Company</th>
-                      <th>Start Date</th>
-                      <th>End Date</th>
-                      <th>Stipend</th>
-                      <th>PPO</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedInternships.map((int, idx) => (
-                      <tr key={idx}>
-                        <td style={{ fontWeight: 600 }}>{int.studentName}</td>
-                        <td>{int.branch}</td>
-                        <td style={{ fontWeight: 600 }}>{int.companyName}</td>
-                        <td>{formatDate(int.startDate)}</td>
-                        <td>{formatDate(int.endDate)}</td>
-                        <td style={{ fontWeight: 600, color: "var(--primary)" }}>{formatStipend(int.stipend)}</td>
-                        <td style={{ fontWeight: 600, color: int.ppo === "Yes" ? "var(--success)" : "var(--text-secondary)" }}>{int.ppo}</td>
-                        <td>
-                          <span className="tag" style={{ 
-                            background: int.status === "Active" ? "rgba(16, 185, 129, 0.12)" : "rgba(71, 85, 105, 0.1)",
-                            color: int.status === "Active" ? "var(--success)" : "var(--text-secondary)",
-                            border: "none",
-                            fontWeight: 600
-                          }}>
-                            {int.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {intPages > 1 && (
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12 }}>
-                  <button 
-                    disabled={internshipsPage === 1}
-                    onClick={() => setInternshipsPage(p => Math.max(1, p - 1))}
-                    className="btn btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: 11 }}
-                  >
-                    Previous
-                  </button>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                    Page <strong>{internshipsPage}</strong> of {intPages}
-                  </span>
-                  <button 
-                    disabled={internshipsPage === intPages}
-                    onClick={() => setInternshipsPage(p => Math.min(intPages, p + 1))}
-                    className="btn btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: 11 }}
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Company Analytics Table */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <h3 style={{ fontSize: 18, borderBottom: "1px solid var(--border-color)", paddingBottom: 12, margin: 0 }}>Company Recruiter Intern Stats</h3>
-          
-          {paginatedCompanies.length === 0 ? (
-            <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>No recruiter intern stats available.</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1 }}>
-              <div className="table-container" style={{ flex: 1 }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Company Name</th>
-                      <th style={{ textAlign: "center" }}>Interns</th>
-                      <th>Average Stipend</th>
-                      <th>Highest Stipend</th>
-                      <th style={{ textAlign: "center" }}>PPO Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedCompanies.map((c, idx) => (
-                      <tr key={idx}>
-                        <td style={{ fontWeight: 600 }}>{c.companyName}</td>
-                        <td style={{ textAlign: "center", fontWeight: 600 }}>{c.internsCount}</td>
-                        <td style={{ fontWeight: 600, color: "var(--primary)" }}>{formatStipend(c.averageStipend)}</td>
-                        <td>{formatStipend(c.highestStipend)}</td>
-                        <td style={{ textAlign: "center", fontWeight: 600, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)" }}>{c.ppoCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {compPages > 1 && (
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12 }}>
-                  <button 
-                    disabled={companiesPage === 1}
-                    onClick={() => setCompaniesPage(p => Math.max(1, p - 1))}
-                    className="btn btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: 11 }}
-                  >
-                    Previous
-                  </button>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                    Page <strong>{companiesPage}</strong> of {compPages}
-                  </span>
-                  <button 
-                    disabled={companiesPage === compPages}
-                    onClick={() => setCompaniesPage(p => Math.min(compPages, p + 1))}
-                    className="btn btn-secondary"
-                    style={{ padding: "4px 10px", fontSize: 11 }}
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-      </div>
 
     </div>
   );
@@ -3275,12 +3149,12 @@ function AdminStudentPlacements() {
   const paginatedStudents = sortedStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const formatLPA = (val) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
+    if (val === null || val === undefined || isNaN(val)) return "ΓÇö";
     return `${parseFloat(Number(val).toFixed(2))} LPA`;
   };
 
   const formatDate = (val) => {
-    if (!val) return "—";
+    if (!val) return "ΓÇö";
     return new Date(val).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   };
 
@@ -3426,22 +3300,22 @@ function AdminStudentPlacements() {
               <thead>
                 <tr>
                   <th style={{ cursor: "pointer" }} onClick={() => handleSort("name")}>
-                    Student Name {sortField === "name" && (sortOrder === "asc" ? "▲" : "▼")}
+                    Student Name {sortField === "name" && (sortOrder === "asc" ? "Γû▓" : "Γû╝")}
                   </th>
                   <th style={{ cursor: "pointer" }} onClick={() => handleSort("prn")}>
-                    PRN {sortField === "prn" && (sortOrder === "asc" ? "▲" : "▼")}
+                    PRN {sortField === "prn" && (sortOrder === "asc" ? "Γû▓" : "Γû╝")}
                   </th>
                   <th style={{ cursor: "pointer" }} onClick={() => handleSort("branch")}>
-                    Branch {sortField === "branch" && (sortOrder === "asc" ? "▲" : "▼")}
+                    Branch {sortField === "branch" && (sortOrder === "asc" ? "Γû▓" : "Γû╝")}
                   </th>
                   <th>Gender</th>
                   <th>Primary Company</th>
                   <th style={{ cursor: "pointer" }} onClick={() => handleSort("primaryPackage")}>
-                    Primary Package {sortField === "primaryPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                    Primary Package {sortField === "primaryPackage" && (sortOrder === "asc" ? "Γû▓" : "Γû╝")}
                   </th>
                   <th>Secondary Company</th>
                   <th style={{ cursor: "pointer" }} onClick={() => handleSort("secondaryPackage")}>
-                    Secondary Package {sortField === "secondaryPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                    Secondary Package {sortField === "secondaryPackage" && (sortOrder === "asc" ? "Γû▓" : "Γû╝")}
                   </th>
                   <th style={{ textAlign: "center" }}>Internship</th>
                   <th>Placement Status</th>
@@ -3463,11 +3337,11 @@ function AdminStudentPlacements() {
                       <td>{student.gender}</td>
                       
                       {/* Primary Company & Package */}
-                      <td style={{ fontWeight: 600 }}>{primaryOffer.companyName || "—"}</td>
+                      <td style={{ fontWeight: 600 }}>{primaryOffer.companyName || "ΓÇö"}</td>
                       <td style={{ fontWeight: 600, color: primaryOffer.packageLpa ? "var(--primary)" : "var(--text-secondary)" }}>{formatLPA(primaryOffer.packageLpa)}</td>
                       
                       {/* Secondary Company & Package */}
-                      <td style={{ fontWeight: 600 }}>{secondaryOffer.companyName || "—"}</td>
+                      <td style={{ fontWeight: 600 }}>{secondaryOffer.companyName || "ΓÇö"}</td>
                       <td style={{ fontWeight: 600, color: secondaryOffer.packageLpa ? "var(--primary)" : "var(--text-secondary)" }}>{formatLPA(secondaryOffer.packageLpa)}</td>
                       
                       {/* Internship Offered flag */}
@@ -3700,7 +3574,7 @@ function AdminStudentPlacements() {
                 </div>
                 <div className="form-row-2col" style={{ marginTop: 12 }}>
                   <div className="form-group">
-                    <label>Internship Stipend (₹/month)</label>
+                    <label>Internship Stipend (Γé╣/month)</label>
                     <input
                       type="number"
                       className="form-control"
@@ -3806,9 +3680,9 @@ function AdminStudentPlacements() {
                   <div>PRN: <strong>{detailStudent.prn}</strong></div>
                   <div>Branch: <strong>{detailStudent.branch}</strong></div>
                   <div>Gender: <strong>{detailStudent.gender}</strong></div>
-                  <div>Personal Mail: <strong>{detailStudent.personalEmail || "—"}</strong></div>
-                  <div>College Mail: <strong>{detailStudent.collegeEmail || "—"}</strong></div>
-                  <div>Phone No: <strong>{detailStudent.phone || "—"}</strong></div>
+                  <div>Personal Mail: <strong>{detailStudent.personalEmail || "ΓÇö"}</strong></div>
+                  <div>College Mail: <strong>{detailStudent.collegeEmail || "ΓÇö"}</strong></div>
+                  <div>Phone No: <strong>{detailStudent.phone || "ΓÇö"}</strong></div>
                 </div>
               </div>
 
@@ -3851,7 +3725,7 @@ function AdminStudentPlacements() {
                           </span>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 6 }}>
-                          <div>Stipend: <strong>{intern.stipend ? `₹${intern.stipend.toLocaleString()}/month` : "—"}</strong></div>
+                          <div>Stipend: <strong>{intern.stipend ? `Γé╣${intern.stipend.toLocaleString()}/month` : "ΓÇö"}</strong></div>
                           <div>PPO Status: <strong>{intern.ppo || "No"}</strong></div>
                           <div>Start Date: <strong>{formatDate(intern.startDate)}</strong></div>
                           <div>End Date: <strong>{formatDate(intern.endDate)}</strong></div>
@@ -3909,7 +3783,7 @@ function AdminStudentPlacements() {
                       </div>
                       <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 4 }}>
                         <div>Salary Package: <strong>{formatLPA(offer.packageLpa)}</strong></div>
-                        <div>Offer Date: {offer.offerDate ? formatDate(offer.offerDate) : "—"}</div>
+                        <div>Offer Date: {offer.offerDate ? formatDate(offer.offerDate) : "ΓÇö"}</div>
                         <div>Status: <strong style={{ color: "var(--success)" }}>{offer.placementStatus || "Placed"}</strong></div>
                       </div>
                     </div>
@@ -4019,10 +3893,10 @@ function AdminReports() {
     
     const pkgs = [];
     filteredStudents.forEach(s => s.offers?.forEach(o => { if (typeof o.packageLpa === "number") pkgs.push(o.packageLpa); }));
-    const avg = pkgs.length > 0 ? (pkgs.reduce((a,b)=>a+b, 0)/pkgs.length).toFixed(2) : "—";
-    const medianVal = pkgs.length > 0 ? calculateMedian(pkgs).toFixed(2) : "—";
-    const highest = pkgs.length > 0 ? Math.max(...pkgs).toFixed(2) : "—";
-    const lowest = pkgs.length > 0 ? Math.min(...pkgs).toFixed(2) : "—";
+    const avg = pkgs.length > 0 ? (pkgs.reduce((a,b)=>a+b, 0)/pkgs.length).toFixed(2) : "ΓÇö";
+    const medianVal = pkgs.length > 0 ? calculateMedian(pkgs).toFixed(2) : "ΓÇö";
+    const highest = pkgs.length > 0 ? Math.max(...pkgs).toFixed(2) : "ΓÇö";
+    const lowest = pkgs.length > 0 ? Math.min(...pkgs).toFixed(2) : "ΓÇö";
     
     const internshipsCount = filteredStudents.reduce((acc, s) => acc + (s.internships?.length || 0), 0);
     const ppoCount = filteredStudents.filter(s => s.internships?.some(i => i.ppo === "Yes")).length;
@@ -4032,10 +3906,10 @@ function AdminReports() {
       { metric: "Total Students", value: total },
       { metric: "Placed Students", value: placed },
       { metric: "Placement Percentage", value: `${rate}%` },
-      { metric: "Average Package", value: avg !== "—" ? `${avg} LPA` : "—" },
-      { metric: "Median Package", value: medianVal !== "—" ? `${medianVal} LPA` : "—" },
-      { metric: "Highest Package", value: highest !== "—" ? `${highest} LPA` : "—" },
-      { metric: "Lowest Package", value: lowest !== "—" ? `${lowest} LPA` : "—" },
+      { metric: "Average Package", value: avg !== "ΓÇö" ? `${avg} LPA` : "ΓÇö" },
+      { metric: "Median Package", value: medianVal !== "ΓÇö" ? `${medianVal} LPA` : "ΓÇö" },
+      { metric: "Highest Package", value: highest !== "ΓÇö" ? `${highest} LPA` : "ΓÇö" },
+      { metric: "Lowest Package", value: lowest !== "ΓÇö" ? `${lowest} LPA` : "ΓÇö" },
       { metric: "Total Internships", value: internshipsCount },
       { metric: "PPO Conversions", value: ppoCount },
       { metric: "Students with Multiple Offers", value: multipleOffers }
@@ -4083,10 +3957,10 @@ function AdminReports() {
       return {
         companyName: name,
         placedCount: c.studentsSet.size,
-        averagePackage: avg !== null ? `${avg} LPA` : "—",
-        medianPackage: med !== null ? `${med} LPA` : "—",
-        highestPackage: max !== null ? `${max} LPA` : "—",
-        lowestPackage: min !== null ? `${min} LPA` : "—",
+        averagePackage: avg !== null ? `${avg} LPA` : "ΓÇö",
+        medianPackage: med !== null ? `${med} LPA` : "ΓÇö",
+        highestPackage: max !== null ? `${max} LPA` : "ΓÇö",
+        lowestPackage: min !== null ? `${min} LPA` : "ΓÇö",
         internshipsCount: c.internships,
         ppoCount: c.ppos
       };
@@ -4132,10 +4006,10 @@ function AdminReports() {
         totalStudents: b.total,
         placedStudents: b.placed,
         placementPercentage: `${pct}%`,
-        averagePackage: avg !== null ? `${avg} LPA` : "—",
-        medianPackage: med !== null ? `${med} LPA` : "—",
-        highestPackage: max !== null ? `${max} LPA` : "—",
-        lowestPackage: min !== null ? `${min} LPA` : "—",
+        averagePackage: avg !== null ? `${avg} LPA` : "ΓÇö",
+        medianPackage: med !== null ? `${med} LPA` : "ΓÇö",
+        highestPackage: max !== null ? `${max} LPA` : "ΓÇö",
+        lowestPackage: min !== null ? `${min} LPA` : "ΓÇö",
         internshipCount: b.internships,
         ppoCount: b.ppos,
         multipleOffers: b.multiple
@@ -4155,10 +4029,10 @@ function AdminReports() {
         prn: s.prn,
         branch: s.branch,
         gender: s.gender,
-        primaryCompany: primary.companyName || "—",
-        primaryPackage: primary.packageLpa !== undefined ? `${primary.packageLpa} LPA` : "—",
-        secondaryCompany: secondary.companyName || "—",
-        secondaryPackage: secondary.packageLpa !== undefined ? `${secondary.packageLpa} LPA` : "—",
+        primaryCompany: primary.companyName || "ΓÇö",
+        primaryPackage: primary.packageLpa !== undefined ? `${primary.packageLpa} LPA` : "ΓÇö",
+        secondaryCompany: secondary.companyName || "ΓÇö",
+        secondaryPackage: secondary.packageLpa !== undefined ? `${secondary.packageLpa} LPA` : "ΓÇö",
         internship: s.internships && s.internships.length > 0 ? "Yes" : "No",
         status: s.offers && s.offers.length > 0 ? "Placed" : "Unplaced"
       };
@@ -4174,10 +4048,10 @@ function AdminReports() {
         reportData.push({
           name: s.name,
           branch: s.branch,
-          companyName: i.companyName || "—",
-          startDate: i.startDate ? new Date(i.startDate).toLocaleDateString() : "—",
-          endDate: i.endDate ? new Date(i.endDate).toLocaleDateString() : "—",
-          stipend: i.stipend !== undefined && i.stipend !== null ? `₹${i.stipend.toLocaleString()}/mo` : "—",
+          companyName: i.companyName || "ΓÇö",
+          startDate: i.startDate ? new Date(i.startDate).toLocaleDateString() : "ΓÇö",
+          endDate: i.endDate ? new Date(i.endDate).toLocaleDateString() : "ΓÇö",
+          stipend: i.stipend !== undefined && i.stipend !== null ? `Γé╣${i.stipend.toLocaleString()}/mo` : "ΓÇö",
           ppo: i.ppo || "No",
           status: i.status || "Active"
         });
@@ -4195,7 +4069,7 @@ function AdminReports() {
           name: s.name,
           prn: s.prn,
           branch: s.branch,
-          companyName: o.companyName || "—",
+          companyName: o.companyName || "ΓÇö",
           packageLpa: o.packageLpa !== undefined ? o.packageLpa : null,
           offerType: o.offerType || "PRIMARY",
           status: o.placementStatus || "Placed"
@@ -4212,7 +4086,7 @@ function AdminReports() {
     // Format package fields on screen
     reportData = reportData.map(r => ({
       ...r,
-      packageLpa: r.packageLpa !== null ? `${r.packageLpa} LPA` : "—"
+      packageLpa: r.packageLpa !== null ? `${r.packageLpa} LPA` : "ΓÇö"
     }));
   }
 
@@ -4227,10 +4101,10 @@ function AdminReports() {
         name: s.name,
         prn: s.prn,
         branch: s.branch,
-        primaryCompany: primary.companyName || "—",
-        primaryPackage: primary.packageLpa !== undefined ? `${primary.packageLpa} LPA` : "—",
-        secondaryCompany: secondary.companyName || "—",
-        secondaryPackage: secondary.packageLpa !== undefined ? `${secondary.packageLpa} LPA` : "—",
+        primaryCompany: primary.companyName || "ΓÇö",
+        primaryPackage: primary.packageLpa !== undefined ? `${primary.packageLpa} LPA` : "ΓÇö",
+        secondaryCompany: secondary.companyName || "ΓÇö",
+        secondaryPackage: secondary.packageLpa !== undefined ? `${secondary.packageLpa} LPA` : "ΓÇö",
         totalOffers: s.offers.length
       };
     });
@@ -4397,7 +4271,7 @@ function AdminReports() {
                     <tr key={rIdx}>
                       {cells.map((cell, cIdx) => (
                         <td key={cIdx} style={cIdx === 0 ? { fontWeight: 600 } : {}}>
-                          {cell !== null && cell !== undefined ? "" + cell : "—"}
+                          {cell !== null && cell !== undefined ? "" + cell : "ΓÇö"}
                         </td>
                       ))}
                     </tr>
@@ -4413,727 +4287,3 @@ function AdminReports() {
   );
 }
 
-function AdminDataQuality() {
-  const { token, API_URL, showToast } = useAppContext();
-  const [students, setStudents] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Modals for manual correction
-  const [editStudent, setEditStudent] = useState(null);
-  const [editCompany, setEditCompany] = useState(null);
-  const [editLoading, setEditLoading] = useState(false);
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      
-      const [stuRes, compRes] = await Promise.all([
-        axios.get(`${API_URL}/admin/students`, {
-          headers: authHeaders.headers,
-          params: { limit: 100000 }
-        }),
-        axios.get(`${API_URL}/companies`)
-      ]);
-      
-      setStudents(stuRes.data.students || []);
-      setCompanies(compRes.data || []);
-    } catch (err) {
-      console.error("Error loading quality data:", err);
-      showToast("Failed to fetch data quality components", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [API_URL, token, showToast]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Run audits dynamically
-  const issues = [];
-  const prnMap = {};
-  const nameBranchMap = {};
-
-  students.forEach(s => {
-    // 1. Missing branch
-    if (!s.branch || s.branch.trim() === "") {
-      issues.push({
-        recordType: "Student",
-        recordName: s.name,
-        field: "Branch",
-        problem: "Branch field is empty or blank",
-        action: "Edit student and specify the department branch name",
-        raw: s
-      });
-    }
-
-    // 2. Missing placement status
-    const isPlaced = s.offers && s.offers.length > 0;
-    if (isPlaced) {
-      s.offers.forEach((o, oIdx) => {
-        if (!o.placementStatus || o.placementStatus.trim() === "") {
-          issues.push({
-            recordType: "Placement Offer",
-            recordName: `${s.name} (${o.companyName || "Unknown"})`,
-            field: "Placement Status",
-            problem: "Placement Offer is missing status description",
-            action: "Set status to 'Placed' or 'Selected'",
-            raw: s
-          });
-        }
-
-        // 3. Offers missing package
-        if (o.packageLpa === undefined || o.packageLpa === null || isNaN(o.packageLpa)) {
-          issues.push({
-            recordType: "Placement Offer",
-            recordName: `${s.name} at ${o.companyName || "Unknown"}`,
-            field: "Package LPA",
-            problem: "Salary package value is empty or not defined",
-            action: "Specify package in LPA (e.g. 10 LPA)",
-            raw: s
-          });
-        }
-
-        // 4. Invalid packages
-        if (typeof o.packageLpa === "number" && (o.packageLpa < 0 || o.packageLpa > 150)) {
-          issues.push({
-            recordType: "Placement Offer",
-            recordName: `${s.name} at ${o.companyName || "Unknown"}`,
-            field: "Package LPA",
-            problem: `Salary package value (${o.packageLpa} LPA) is negative or excessively high (>150 LPA)`,
-            action: "Correct salary package LPA value",
-            raw: s
-          });
-        }
-
-        // 5. Offers missing company
-        if (!o.companyName || o.companyName.trim() === "") {
-          issues.push({
-            recordType: "Placement Offer",
-            recordName: s.name,
-            field: "Company Name",
-            problem: "Offer has no assigned company name",
-            action: "Edit student offer and assign a recruiter company name",
-            raw: s
-          });
-        }
-      });
-    }
-
-    s.internships?.forEach((i, iIdx) => {
-      // 6. Internships missing dates
-      if (!i.startDate || !i.endDate) {
-        issues.push({
-          recordType: "Internship",
-          recordName: `${s.name} at ${i.companyName || "Unknown"}`,
-          field: "Start/End Dates",
-          problem: "Internship is missing start or end dates",
-          action: "Edit student and specify both start and end dates",
-          raw: s
-        });
-      }
-
-      // 7. Invalid dates
-      if (i.startDate && i.endDate && new Date(i.startDate) > new Date(i.endDate)) {
-        issues.push({
-          recordType: "Internship",
-          recordName: `${s.name} at ${i.companyName || "Unknown"}`,
-          field: "Start/End Dates",
-          problem: "Start date is scheduled after the end date",
-          action: "Adjust dates so that start date precedes end date",
-          raw: s
-        });
-      }
-
-      // 8. Internships missing stipend
-      if (i.stipend === undefined || i.stipend === null || isNaN(i.stipend)) {
-        issues.push({
-          recordType: "Internship",
-          recordName: `${s.name} at ${i.companyName || "Unknown"}`,
-          field: "Stipend",
-          problem: "Monthly stipend value is empty or not defined",
-          action: "Edit student and enter stipend value (or 0 if unpaid)",
-          raw: s
-        });
-      }
-    });
-
-    // 9. Duplicate PRNs
-    const prn = (s.prn || "").trim();
-    if (prn) {
-      if (!prnMap[prn]) prnMap[prn] = [];
-      prnMap[prn].push(s);
-    }
-
-    // 10. Duplicate student names
-    const nameBranchKey = `${s.name.trim().toLowerCase()}_${(s.branch || "").trim().toLowerCase()}`;
-    if (!nameBranchMap[nameBranchKey]) nameBranchMap[nameBranchKey] = [];
-    nameBranchMap[nameBranchKey].push(s);
-  });
-
-  // Duplicate PRNs
-  Object.keys(prnMap).forEach(prn => {
-    if (prnMap[prn].length > 1) {
-      prnMap[prn].forEach(s => {
-        issues.push({
-          recordType: "Student",
-          recordName: s.name,
-          field: "PRN",
-          problem: `Duplicate PRN value '${prn}' is shared with another student`,
-          action: "Edit student to specify a unique PRN",
-          raw: s
-        });
-      });
-    }
-  });
-
-  // Duplicate student names
-  Object.keys(nameBranchMap).forEach(key => {
-    if (nameBranchMap[key].length > 1) {
-      nameBranchMap[key].forEach(s => {
-        issues.push({
-          recordType: "Student",
-          recordName: `${s.name} (${s.branch})`,
-          field: "Student Record",
-          problem: "Identical student name and branch recorded multiple times in registry",
-          action: "Merge placement data or delete duplicate student record",
-          raw: s
-        });
-      });
-    }
-  });
-
-  // 11. Companies with incomplete information
-  companies.forEach(c => {
-    const missingIndustry = !c.industry || c.industry.trim() === "";
-    const missingLocation = !c.location || c.location.trim() === "";
-    if (missingIndustry || missingLocation) {
-      issues.push({
-        recordType: "Company",
-        recordName: c.name,
-        field: missingIndustry && missingLocation ? "Industry & Location" : missingIndustry ? "Industry" : "Location",
-        problem: `Company is missing ${missingIndustry && missingLocation ? "both industry and location" : missingIndustry ? "industry segment" : "headquarters location"} information`,
-        action: "Edit company details to add missing fields",
-        raw: c
-      });
-    }
-  });
-
-  const handleCorrectData = (issue) => {
-    if (issue.recordType === "Company") {
-      setEditCompany({
-        _id: issue.raw._id,
-        name: issue.raw.name,
-        industry: issue.raw.industry || "",
-        location: issue.raw.location || ""
-      });
-    } else {
-      const student = issue.raw;
-      const primaryOffer = student.offers?.find(o => o.offerType === "PRIMARY") || student.offers?.[0] || {};
-      const secondaryOffer = student.offers?.find(o => o.offerType === "SECONDARY") || student.offers?.[1] || {};
-      const internship = student.internships?.[0] || {};
-
-      setEditStudent({
-        _id: student._id,
-        prn: student.prn,
-        name: student.name,
-        branch: student.branch,
-        gender: student.gender,
-        personalEmail: student.personalEmail || "",
-        collegeEmail: student.collegeEmail || "",
-        phone: student.phone || "",
-        
-        company1: primaryOffer.companyName || "",
-        salary1: primaryOffer.packageLpa !== undefined ? primaryOffer.packageLpa : "",
-        company1Status: primaryOffer.placementStatus || "Placed",
-        
-        company2: secondaryOffer.companyName || "",
-        salary2: secondaryOffer.packageLpa !== undefined ? secondaryOffer.packageLpa : "",
-        company2Status: secondaryOffer.placementStatus || "Placed",
-        
-        internshipOffered: student.internships && student.internships.length > 0 ? "Yes" : "No",
-        internshipCompany: internship.companyName || "",
-        stipend: internship.stipend !== undefined ? internship.stipend : "",
-        ppo: internship.ppo || "No",
-        internshipStatus: internship.status || "Active"
-      });
-    }
-  };
-
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    if (!editStudent.name || !editStudent.prn || !editStudent.branch || !editStudent.gender) {
-      showToast("Please fill all required fields", "error");
-      return;
-    }
-    setEditLoading(true);
-    try {
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      
-      const offers = [];
-      if (editStudent.company1) {
-        offers.push({
-          companyName: editStudent.company1,
-          packageLpa: editStudent.salary1 !== "" ? Number(editStudent.salary1) : undefined,
-          offerType: "PRIMARY",
-          placementStatus: editStudent.company1Status || "Placed"
-        });
-      }
-      if (editStudent.company2) {
-        offers.push({
-          companyName: editStudent.company2,
-          packageLpa: editStudent.salary2 !== "" ? Number(editStudent.salary2) : undefined,
-          offerType: "SECONDARY",
-          placementStatus: editStudent.company2Status || "Placed"
-        });
-      }
-
-      const internships = [];
-      if (editStudent.internshipOffered === "Yes" && editStudent.internshipCompany) {
-        internships.push({
-          companyName: editStudent.internshipCompany,
-          stipend: editStudent.stipend !== "" ? Number(editStudent.stipend) : undefined,
-          ppo: editStudent.ppo || "No",
-          status: editStudent.internshipStatus || "Active"
-        });
-      }
-
-      const payload = {
-        name: editStudent.name,
-        branch: editStudent.branch,
-        gender: editStudent.gender,
-        personalEmail: editStudent.personalEmail,
-        collegeEmail: editStudent.collegeEmail,
-        phone: editStudent.phone,
-        offers,
-        internships
-      };
-
-      await axios.put(`${API_URL}/admin/students/${editStudent._id}`, payload, authHeaders);
-      showToast("Student details corrected successfully!");
-      setEditStudent(null);
-      loadData();
-    } catch (err) {
-      console.error("Error saving student corrections:", err);
-      showToast("Failed to correct student placement", "error");
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleEditCompanySubmit = async (e) => {
-    e.preventDefault();
-    if (!editCompany.name) {
-      showToast("Company name is required", "error");
-      return;
-    }
-    setEditLoading(true);
-    try {
-      const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      await axios.put(`${API_URL}/companies/${editCompany._id}`, {
-        name: editCompany.name,
-        industry: editCompany.industry,
-        location: editCompany.location
-      }, authHeaders);
-      showToast("Company details corrected successfully!");
-      setEditCompany(null);
-      loadData();
-    } catch (err) {
-      console.error("Error correcting company:", err);
-      showToast("Failed to correct company information", "error");
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
-      
-      {/* Overview stats */}
-      <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div>
-          <h2 style={{ fontSize: 20 }}>Data Quality Audits for Placement Data</h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4 }}>
-            Overview of registry verification, integrity anomalies, and incomplete fields.
-          </p>
-        </div>
-
-        <div className="wce-stats-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: 20, margin: 0 }}>
-          <div className="wce-stat-card" style={{ borderLeft: "4px solid var(--primary)" }}>
-            <div className="wce-stat-info">
-              <h3>{students.length}</h3>
-              <p>Total Student Records Checked</p>
-            </div>
-          </div>
-          <div className="wce-stat-card" style={{ borderLeft: "4px solid var(--secondary)" }}>
-            <div className="wce-stat-info">
-              <h3>{companies.length}</h3>
-              <p>Total Company Profiles Checked</p>
-            </div>
-          </div>
-          <div className="wce-stat-card" style={{ borderLeft: issues.length > 0 ? "4px solid var(--danger)" : "4px solid var(--success)" }}>
-            <div className="wce-stat-info">
-              <h3 style={{ color: issues.length > 0 ? "var(--danger)" : "var(--success)" }}>{issues.length}</h3>
-              <p>Data Quality Issues Found</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Issues Table */}
-      <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <h3 style={{ fontSize: 18, borderBottom: "1px solid var(--border-color)", paddingBottom: 12, margin: 0 }}>
-          Audited Anomalies Listing ({issues.length})
-        </h3>
-
-        {issues.length === 0 ? (
-          <div style={{ textAlign: "center", color: "var(--success)", padding: "40px 20px" }}>
-            <Check size={48} style={{ marginBottom: 16 }} />
-            <h4>All Data Quality Checks Passed!</h4>
-            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 8 }}>
-              No missing branches, stipend fields, duplicate PRNs, or invalid package entries found.
-            </p>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 140 }}>Record Type</th>
-                  <th style={{ width: 180 }}>Record</th>
-                  <th style={{ width: 150 }}>Field</th>
-                  <th>Problem / Anomaly Description</th>
-                  <th>Suggested Corrective Action</th>
-                  <th style={{ width: 120, textAlign: "center" }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {issues.map((issue, idx) => (
-                  <tr key={idx}>
-                    <td>
-                      <span className="tag" style={{
-                        background: issue.recordType === "Company" ? "rgba(138, 63, 252, 0.12)" : "rgba(6, 182, 212, 0.12)",
-                        color: issue.recordType === "Company" ? "var(--secondary)" : "var(--primary)",
-                        fontWeight: 600, border: "none"
-                      }}>
-                        {issue.recordType}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{issue.recordName}</td>
-                    <td style={{ fontWeight: 600, color: "var(--accent)" }}>{issue.field}</td>
-                    <td style={{ color: "var(--danger)" }}>{issue.problem}</td>
-                    <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{issue.action}</td>
-                    <td style={{ textAlign: "center" }}>
-                      <button 
-                        onClick={() => handleCorrectData(issue)}
-                        className="btn btn-primary"
-                        style={{ padding: "4px 10px", fontSize: 11, height: 28 }}
-                      >
-                        Correct Data
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Edit Student Modal Overlay */}
-      {editStudent && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: 700 }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: 18 }}>Correct Student Placement Record</h3>
-              <button 
-                onClick={() => setEditStudent(null)} 
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div className="form-row-2col">
-                <div className="form-group">
-                  <label>Full Name <span style={{ color: "var(--danger)" }}>*</span></label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editStudent.name}
-                    onChange={(e) => setEditStudent({ ...editStudent, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>PRN <span style={{ color: "var(--danger)" }}>*</span></label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editStudent.prn}
-                    onChange={(e) => setEditStudent({ ...editStudent, prn: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row-2col">
-                <div className="form-group">
-                  <label>Branch <span style={{ color: "var(--danger)" }}>*</span></label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={editStudent.branch}
-                    onChange={(e) => setEditStudent({ ...editStudent, branch: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Gender <span style={{ color: "var(--danger)" }}>*</span></label>
-                  <select
-                    className="form-control"
-                    value={editStudent.gender}
-                    onChange={(e) => setEditStudent({ ...editStudent, gender: e.target.value })}
-                    required
-                    style={{ height: 38 }}
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
-                <h4 style={{ fontSize: 14, marginBottom: 12, color: "var(--primary)" }}>Placement Offers</h4>
-                <div className="form-row-2col">
-                  <div className="form-group">
-                    <label>Company 1 (Primary)</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={editStudent.company1}
-                      onChange={(e) => setEditStudent({ ...editStudent, company1: e.target.value })}
-                      placeholder="e.g. Seagate"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Salary Package 1 (LPA)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      value={editStudent.salary1}
-                      onChange={(e) => setEditStudent({ ...editStudent, salary1: e.target.value })}
-                      placeholder="e.g. 12"
-                    />
-                  </div>
-                </div>
-                <div className="form-row-2col" style={{ marginTop: 12 }}>
-                  <div className="form-group">
-                    <label>Company 2 (Secondary)</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={editStudent.company2}
-                      onChange={(e) => setEditStudent({ ...editStudent, company2: e.target.value })}
-                      placeholder="e.g. Google"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Salary Package 2 (LPA)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      value={editStudent.salary2}
-                      onChange={(e) => setEditStudent({ ...editStudent, salary2: e.target.value })}
-                      placeholder="e.g. 30"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
-                <h4 style={{ fontSize: 14, marginBottom: 12, color: "var(--primary)" }}>Internship Details</h4>
-                <div className="form-row-2col">
-                  <div className="form-group">
-                    <label>Internship Offered</label>
-                    <select
-                      className="form-control"
-                      value={editStudent.internshipOffered}
-                      onChange={(e) => setEditStudent({ ...editStudent, internshipOffered: e.target.value })}
-                      style={{ height: 38 }}
-                    >
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Internship Company</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={editStudent.internshipCompany}
-                      onChange={(e) => setEditStudent({ ...editStudent, internshipCompany: e.target.value })}
-                      placeholder="e.g. Seagate"
-                    />
-                  </div>
-                </div>
-                <div className="form-row-2col" style={{ marginTop: 12 }}>
-                  <div className="form-group">
-                    <label>Internship Stipend (₹/month)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={editStudent.stipend}
-                      onChange={(e) => setEditStudent({ ...editStudent, stipend: e.target.value })}
-                      placeholder="e.g. 35000"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>PPO Status</label>
-                    <select
-                      className="form-control"
-                      value={editStudent.ppo}
-                      onChange={(e) => setEditStudent({ ...editStudent, ppo: e.target.value })}
-                      style={{ height: 38 }}
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                      <option value="Pending">Pending</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
-                <h4 style={{ fontSize: 14, marginBottom: 12, color: "var(--primary)" }}>Contact Information</h4>
-                <div className="form-row-3col">
-                  <div className="form-group">
-                    <label>Personal Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      value={editStudent.personalEmail}
-                      onChange={(e) => setEditStudent({ ...editStudent, personalEmail: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>College Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      value={editStudent.collegeEmail}
-                      onChange={(e) => setEditStudent({ ...editStudent, collegeEmail: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Phone Number</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={editStudent.phone}
-                      onChange={(e) => setEditStudent({ ...editStudent, phone: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 10 }}>
-                <button 
-                  type="button" 
-                  onClick={() => setEditStudent(null)}
-                  className="btn btn-secondary"
-                  disabled={editLoading}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
-                  disabled={editLoading}
-                >
-                  {editLoading ? "Correcting..." : "Save Corrections"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Company Modal Overlay */}
-      {editCompany && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: 500 }}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: 18 }}>Correct Company Details</h3>
-              <button 
-                onClick={() => setEditCompany(null)} 
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleEditCompanySubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div className="form-group">
-                <label>Company Name <span style={{ color: "var(--danger)" }}>*</span></label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={editCompany.name}
-                  onChange={(e) => setEditCompany({ ...editCompany, name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Industry Segment</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={editCompany.industry}
-                  onChange={(e) => setEditCompany({ ...editCompany, industry: e.target.value })}
-                  placeholder="e.g. Technology, Finance, Core Engineering"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Headquarters Location</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={editCompany.location}
-                  onChange={(e) => setEditCompany({ ...editCompany, location: e.target.value })}
-                  placeholder="e.g. Pune, Bangalore, Mumbai"
-                />
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 10 }}>
-                <button 
-                  type="button" 
-                  onClick={() => setEditCompany(null)}
-                  className="btn btn-secondary"
-                  disabled={editLoading}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
-                  disabled={editLoading}
-                >
-                  {editLoading ? "Correcting..." : "Save Corrections"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}

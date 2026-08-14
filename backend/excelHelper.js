@@ -49,30 +49,6 @@ export const parseCompaniesExcel = (buffer) => {
   }).filter(c => c.name); // Filter out rows without a company name
 };
 
-// Maps Excel fields to Yearly Placement Stats properties
-export const parseStatsExcel = (buffer) => {
-  const workbook = xlsx.read(buffer, { type: "buffer" });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows = xlsx.utils.sheet_to_json(sheet);
-
-  return rows.map(row => {
-    const norm = normalizeKeys(row);
-
-    const year = Number(row["Year"] || norm["year"] || 0);
-    const companies = Number(row["Total Companies Visited"] || row["Total Companies"] || row["Companies"] || norm["totalcompaniesvisited"] || norm["totalcompanies"] || norm["companies"] || 0);
-    const placed = Number(row["Total Students Placed"] || row["Total Students"] || row["Placed"] || row["Students Placed"] || norm["totalstudentsplaced"] || norm["totalstudents"] || norm["placed"] || norm["studentsplaced"] || 0);
-    const avgPackage = Number(row["Average Package"] || row["Average Package (LPA)"] || row["Average"] || row["Avg Package"] || norm["averagepackage"] || norm["averagepackagelpa"] || norm["average"] || norm["avgpackage"] || 0);
-
-    return {
-      year,
-      companies,
-      placed,
-      avgPackage
-    };
-  }).filter(s => s.year > 0); // Filter out rows without a valid year
-};
-
 // Maps Excel fields to Student Placement Record properties
 export const parsePlacementRecordsExcel = (buffer) => {
   const workbook = xlsx.read(buffer, { type: "buffer" });
