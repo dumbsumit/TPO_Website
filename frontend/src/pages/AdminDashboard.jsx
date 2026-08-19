@@ -41,17 +41,15 @@ export default function AdminDashboard() {
   // Excel Upload Refs
   const placementFileRef = useRef(null);
   const [placementFileName, setPlacementFileName] = useState("");
+  const [selectedExcelFile, setSelectedExcelFile] = useState(null);
 
   // Branch Config state
   const [branchConfigs, setBranchConfigs] = useState([]);      // [{branch, registeredCount, _id}]
   const [branchEdits, setBranchEdits]   = useState({});        // {_id|branch -> editedCount}
   const [branchSaving, setBranchSaving] = useState({});        // {branch -> bool}
-  const [newBranch, setNewBranch]       = useState("");         // dropdown value
-  const [newBranchCustom, setNewBranchCustom] = useState("");  // typed custom branch
+  const [newBranch, setNewBranch]       = useState("");         // dynamic input/select value
   const [newCount, setNewCount]         = useState("");
   const [branchAdding, setBranchAdding] = useState(false);
-
-  const KNOWN_BRANCHES = ["CSE", "ENTC", "MECH", "CIVIL", "EE", "IT", "INSTRU", "Other"];
 
   // Fetch dashboard data
   const loadDashboardData = useCallback(async () => {
@@ -120,13 +118,13 @@ export default function AdminDashboard() {
 
   // Add new branch
   const handleAddBranch = async () => {
-    const branchName = (newBranch === "Other" ? newBranchCustom : newBranch).trim();
+    const branchName = newBranch.trim();
     if (!branchName) { showToast("Please select or enter a branch name", "error"); return; }
     const parsed = Number(newCount);
     if (isNaN(parsed) || parsed < 0) { showToast("Enter a valid non-negative count", "error"); return; }
     // Check duplicate
     if (branchConfigs.some(c => c.branch.toLowerCase() === branchName.toLowerCase())) {
-      showToast(`Branch "${branchName}" already exists. Edit it directly in the table.`, "error");
+      showToast(`Branch "${branchName}" already exists in table. Edit its count directly in the table above.`, "error");
       return;
     }
     setBranchAdding(true);
@@ -137,7 +135,7 @@ export default function AdminDashboard() {
         { withCredentials: true }
       );
       showToast(`Added: ${branchName} → ${parsed} registered`, "success");
-      setNewBranch(""); setNewBranchCustom(""); setNewCount("");
+      setNewBranch(""); setNewCount("");
       await loadBranchConfigs();
     } catch (err) {
       showToast(err.response?.data?.message || "Failed to add branch", "error");
@@ -150,6 +148,25 @@ export default function AdminDashboard() {
   const handleFinalizeSubmission = async () => {
     setLoading(true);
     try {
+      if (selectedExcelFile) {
+        const formData = new FormData();
+        formData.append("file", selectedExcelFile);
+
+        const response = await axios.post(
+          `${API_URL}/admin/import-placement-excel`,
+          formData,
+          {
+            withCredentials: true,
+            headers: {
+              "Content-Type": "multipart/form-data"
+            }
+          }
+        );
+        setImportResult(response.data);
+        setSelectedExcelFile(null);
+        if (placementFileRef.current) placementFileRef.current.value = "";
+      }
+
       for (const cfg of branchConfigs) {
         const edited = branchEdits[cfg.branch];
         if (edited !== undefined && Number(edited) !== cfg.registeredCount) {
@@ -165,7 +182,7 @@ export default function AdminDashboard() {
       showToast("Spreadsheet data & branch registered counts verified and saved! Analysis complete.", "success");
     } catch (err) {
       console.error("Submission error:", err);
-      showToast("Failed to complete data verification.", "error");
+      showToast(err.response?.data?.message || "Failed to complete data verification.", "error");
     } finally {
       setLoading(false);
     }
@@ -338,37 +355,13 @@ export default function AdminDashboard() {
                     ref={placementFileRef}
                     style={{ display: "none" }}
                     accept=".xlsx, .xls, .csv"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const file = e.target.files[0];
                       if (!file) return;
 
-                      setPlacementFileName(file.name);
-
-                      const formData = new FormData();
-                      formData.append("file", file);
-
-                      setLoading(true);
-                      try {
-                        const response = await axios.post(
-                          `${API_URL}/admin/import-placement-excel`,
-                          formData,
-                          {
-                            withCredentials: true,
-                            headers: {
-                              "Content-Type": "multipart/form-data"
-                            }
-                          }
-                        );
-
-                        showToast("Spreadsheet uploaded & processed! Review branch counts below.", "success");
-                        setImportResult(response.data);
-                        if (placementFileRef.current) placementFileRef.current.value = "";
-                      } catch (err) {
-                        console.error("Student records import error:", err);
-                        showToast(err.response?.data?.message || "Failed to process student placement records file.", "error");
-                      } finally {
-                        setLoading(false);
-                      }
+                      setSelectedExcelFile(file);
+                      setPlacementFileName(`Selected: ${file.name} (Click 'Verify & Submit' below to process)`);
+                      showToast(`File "${file.name}" selected. Review branch counts below and click 'Verify & Submit'.`, "info");
                     }}
                     disabled={loading}
                   />
@@ -383,10 +376,9 @@ export default function AdminDashboard() {
                   <Download size={14} style={{ marginRight: 6 }} /> Download Detailed Placement Records CSV Template
                 </button>
 
-                {/* ── Summary & Branch Registered Students Config & Submit (shown after upload) ── */}
-                {importResult && (
-                  <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 20 }}>
-                    {/* 1. Upload Result Summary */}
+                <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+                  {/* 1. Upload Result Summary (shown when a file was uploaded in this session) */}
+                  {importResult && (
                     <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", padding: 20, background: "rgba(16,185,129,0.04)" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -423,139 +415,133 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     </div>
+                  )}
 
-                    {/* 2. Branch Registered Students Count Config Editor */}
-                    <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--bg-secondary)" }}>
-                      <div style={{ padding: "14px 20px", background: "rgba(99,102,241,0.08)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: 10 }}>
-                        <Layers size={16} style={{ color: "var(--accent)" }} />
-                        <div>
-                          <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Set / Edit Branch Registered Students Count</h3>
-                          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
-                            Set total registered students per branch for placement % calculations. Add new branches if needed.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Existing entries table */}
-                      <div style={{ padding: "0 20px" }}>
-                        {branchConfigs.length === 0 ? (
-                          <p style={{ color: "var(--text-muted)", fontSize: 13, padding: "18px 0", textAlign: "center" }}>
-                            No branch configurations yet. Add one below.
-                          </p>
-                        ) : (
-                          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }}>
-                            <thead>
-                              <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                                <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.06em", width: "40%" }}>Branch</th>
-                                <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.06em", width: "35%" }}>Registered Count</th>
-                                <th style={{ width: "25%" }}></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {branchConfigs.map(cfg => (
-                                <tr key={cfg.branch} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                                  <td style={{ padding: "9px 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                                    {cfg.branch}
-                                  </td>
-                                  <td style={{ padding: "9px 8px 9px 0" }}>
-                                    <input
-                                      type="number" min="0"
-                                      className="form-input"
-                                      style={{ width: 110, height: 32, fontSize: 13, padding: "4px 10px" }}
-                                      value={branchEdits[cfg.branch] ?? cfg.registeredCount}
-                                      onChange={e => setBranchEdits(prev => ({ ...prev, [cfg.branch]: e.target.value }))}
-                                    />
-                                  </td>
-                                  <td style={{ padding: "9px 0", textAlign: "right" }}>
-                                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                                      <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        style={{ height: 30, fontSize: 12, padding: "0 10px", display: "flex", alignItems: "center", gap: 4 }}
-                                        disabled={branchSaving[cfg.branch]}
-                                        onClick={() => saveBranchConfig(cfg.branch, branchEdits[cfg.branch] ?? cfg.registeredCount)}
-                                      >
-                                        <Save size={11} />
-                                        {branchSaving[cfg.branch] ? "Saving…" : "Save"}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn btn-danger"
-                                        style={{ height: 30, fontSize: 12, padding: "0 8px", display: "flex", alignItems: "center", gap: 4 }}
-                                        onClick={() => deleteBranchConfig(cfg.branch)}
-                                      >
-                                        <Trash2 size={11} /> Delete
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
-
-                      {/* Add new branch */}
-                      <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border-color)", background: "rgba(0,0,0,0.1)" }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Add New Branch</p>
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Branch</label>
-                            <select
-                              className="form-input"
-                              style={{ height: 34, fontSize: 13, minWidth: 120 }}
-                              value={newBranch}
-                              onChange={e => { setNewBranch(e.target.value); if (e.target.value !== "Other") setNewBranchCustom(""); }}
-                            >
-                              <option value="">-- Select --</option>
-                              {KNOWN_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                            </select>
-                          </div>
-                          {newBranch === "Other" && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                              <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Custom Name</label>
-                              <input type="text" className="form-input" placeholder="e.g. PROD"
-                                style={{ height: 34, fontSize: 13, width: 120 }}
-                                value={newBranchCustom} onChange={e => setNewBranchCustom(e.target.value)}
-                              />
-                            </div>
-                          )}
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Registered Count</label>
-                            <input type="number" min="0" className="form-input" placeholder="e.g. 120"
-                              style={{ height: 34, fontSize: 13, width: 110 }}
-                              value={newCount} onChange={e => setNewCount(e.target.value)}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            style={{ height: 34, fontSize: 13, padding: "0 14px", display: "flex", alignItems: "center", gap: 6 }}
-                            disabled={branchAdding || !newBranch || (newBranch === "Other" && !newBranchCustom.trim()) || newCount === ""}
-                            onClick={handleAddBranch}
-                          >
-                            <Plus size={13} />
-                            {branchAdding ? "Adding…" : "Add Branch"}
-                          </button>
-                        </div>
+                  {/* 2. Branch Registered Students Count Config Editor (Always visible) */}
+                  <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--bg-secondary)" }}>
+                    <div style={{ padding: "14px 20px", background: "rgba(99,102,241,0.08)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", gap: 10 }}>
+                      <Layers size={16} style={{ color: "var(--accent)" }} />
+                      <div>
+                        <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Set / Edit Branch Registered Students Count</h3>
+                        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                          Set total registered students per branch for placement % calculations. Add new branches if needed.
+                        </p>
                       </div>
                     </div>
 
-                    {/* 3. Submit & Verify Button */}
-                    <div style={{ textAlign: "right" }}>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        style={{ height: 44, fontSize: 14, padding: "0 24px", display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", fontWeight: 600, boxShadow: "0 4px 12px rgba(99,102,241,0.25)" }}
-                        onClick={handleFinalizeSubmission}
-                        disabled={loading}
-                      >
-                        <CheckCircle size={18} />
-                        Verify & Submit Data for Placement Analysis
-                      </button>
+                    {/* Existing entries table */}
+                    <div style={{ padding: "0 20px" }}>
+                      {branchConfigs.length === 0 ? (
+                        <p style={{ color: "var(--text-muted)", fontSize: 13, padding: "18px 0", textAlign: "center" }}>
+                          No branch configurations yet. Add one below.
+                        </p>
+                      ) : (
+                        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                              <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.06em", width: "40%" }}>Branch</th>
+                              <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, padding: "8px 0", textTransform: "uppercase", letterSpacing: "0.06em", width: "35%" }}>Registered Count</th>
+                              <th style={{ width: "25%" }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {branchConfigs.map(cfg => (
+                              <tr key={cfg.branch} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                <td style={{ padding: "9px 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                                  {cfg.branch}
+                                </td>
+                                <td style={{ padding: "9px 8px 9px 0" }}>
+                                  <input
+                                    type="number" min="0"
+                                    className="form-input"
+                                    style={{ width: 110, height: 32, fontSize: 13, padding: "4px 10px" }}
+                                    value={branchEdits[cfg.branch] ?? cfg.registeredCount}
+                                    onChange={e => setBranchEdits(prev => ({ ...prev, [cfg.branch]: e.target.value }))}
+                                  />
+                                </td>
+                                <td style={{ padding: "9px 0", textAlign: "right" }}>
+                                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary"
+                                      style={{ height: 30, fontSize: 12, padding: "0 10px", display: "flex", alignItems: "center", gap: 4 }}
+                                      disabled={branchSaving[cfg.branch]}
+                                      onClick={() => saveBranchConfig(cfg.branch, branchEdits[cfg.branch] ?? cfg.registeredCount)}
+                                    >
+                                      <Save size={11} />
+                                      {branchSaving[cfg.branch] ? "Saving…" : "Save"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-danger"
+                                      style={{ height: 30, fontSize: 12, padding: "0 8px", display: "flex", alignItems: "center", gap: 4 }}
+                                      onClick={() => deleteBranchConfig(cfg.branch)}
+                                    >
+                                      <Trash2 size={11} /> Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    {/* Add new branch */}
+                    <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border-color)", background: "rgba(0,0,0,0.1)" }}>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Add New Branch</p>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Branch Name</label>
+                          <input
+                            type="text"
+                            list="uploaded-branches-list"
+                            className="form-input"
+                            placeholder="Type or select branch..."
+                            style={{ height: 34, fontSize: 13, minWidth: 180 }}
+                            value={newBranch}
+                            onChange={e => setNewBranch(e.target.value)}
+                          />
+                          <datalist id="uploaded-branches-list">
+                            {branchConfigs.map(c => <option key={c.branch} value={c.branch} />)}
+                          </datalist>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <label style={{ fontSize: 11, color: "var(--text-muted)" }}>Registered Count</label>
+                          <input type="number" min="0" className="form-input" placeholder="e.g. 120"
+                            style={{ height: 34, fontSize: 13, width: 110 }}
+                            value={newCount} onChange={e => setNewCount(e.target.value)}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ height: 34, fontSize: 13, padding: "0 14px", display: "flex", alignItems: "center", gap: 6 }}
+                          disabled={branchAdding || !newBranch.trim() || newCount === ""}
+                          onClick={handleAddBranch}
+                        >
+                          <Plus size={13} />
+                          {branchAdding ? "Adding…" : "Add Branch"}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  {/* 3. Submit & Verify Button */}
+                  <div style={{ textAlign: "right" }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ height: 44, fontSize: 14, padding: "0 24px", display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", fontWeight: 600, boxShadow: "0 4px 12px rgba(99,102,241,0.25)" }}
+                      onClick={handleFinalizeSubmission}
+                      disabled={loading}
+                    >
+                      <CheckCircle size={18} />
+                      Verify & Submit Data for Placement Analysis
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2589,17 +2575,22 @@ function AdminCompanyAnalytics() {
 function AdminBranchAnalytics() {
   const { token, API_URL, showToast } = useAppContext();
   const [students, setStudents] = useState([]);
+  const [branchConfigs, setBranchConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-      const res = await axios.get(`${API_URL}/admin/students`, {
-        headers: authHeaders.headers,
-        params: { limit: 100000 }
-      });
-      setStudents(res.data.students || []);
+      const [resStudents, resConfigs] = await Promise.all([
+        axios.get(`${API_URL}/admin/students`, {
+          headers: authHeaders.headers,
+          params: { limit: 100000 }
+        }),
+        axios.get(`${API_URL}/admin/branch-config`, { withCredentials: true })
+      ]);
+      setStudents(resStudents.data.students || []);
+      setBranchConfigs(resConfigs.data || []);
     } catch (err) {
       console.error("Error loading branch analytics:", err);
       showToast("Failed to fetch student placements", "error");
@@ -2667,6 +2658,9 @@ function AdminBranchAnalytics() {
     });
   });
 
+  const configMap = {};
+  branchConfigs.forEach(c => { if (c.branch) configMap[c.branch.trim().toLowerCase()] = c.registeredCount; });
+
   const branchStatsList = Object.keys(branchMap).map(name => {
     const b = branchMap[name];
     const pkgs = b.packages;
@@ -2674,11 +2668,14 @@ function AdminBranchAnalytics() {
     const maxPkg = pkgs.length > 0 ? Math.max(...pkgs) : null;
     const minPkg = pkgs.length > 0 ? Math.min(...pkgs) : null;
     const medianPkg = calculateMedian(pkgs);
-    const placementPct = b.totalStudents > 0 ? parseFloat(((b.placedStudents / b.totalStudents) * 100).toFixed(2)) : 0;
+
+    const cfgCount = configMap[name.trim().toLowerCase()];
+    const registeredCount = (cfgCount !== undefined && cfgCount > 0) ? cfgCount : b.totalStudents;
+    const placementPct = registeredCount > 0 ? parseFloat(((b.placedStudents / registeredCount) * 100).toFixed(2)) : 0;
 
     return {
       branchName: name,
-      totalStudents: b.totalStudents,
+      totalStudents: registeredCount,
       placedStudents: b.placedStudents,
       placementPercentage: placementPct,
       averagePackage: avgPkg,

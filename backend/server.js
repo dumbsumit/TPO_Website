@@ -3,12 +3,17 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import router from "./routes.js";
 import authAdminRouter   from "./routes/authAdmin.js";
 import authStudentRouter from "./routes/authStudent.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app      = express();
 const PORT     = process.env.PORT     || 5001;
@@ -29,7 +34,7 @@ mongoose.set("bufferCommands", false);
 const checkDbConnection = (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
     return res.status(503).json({
-      message: "Database connection unavailable. Please start MongoDB service (port 27017) or configure MONGO_URI in backend/.env"
+      message: "Database connection unavailable. Connecting to MongoDB... Please try again in a few seconds."
     });
   }
   next();
@@ -49,23 +54,29 @@ app.get("/", (req, res) => {
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 
-// ─── Database Connection ──────────────────────────────────────────────────────
-mongoose.connect(MONGO_URI)
-  .then(async () => {
-    console.log("Connected to MongoDB successfully.");
-    console.log("Note: Run 'node scripts/createAdmin.js' to create the TPO admin account.");
-    
-    // Automatically clean up legacy indexes from old schemas if present
-    try {
-      const studentsColl = mongoose.connection.collection("students");
-      await studentsColl.dropIndex("prn_1").catch(() => {});
-      await studentsColl.dropIndex("username_1").catch(() => {});
-    } catch (_) {}
-  })
-  .catch(err => {
-    console.error("MongoDB connection error:", err.message);
-  });
+// ─── Database Connection with Retry ───────────────────────────────────────────
+const connectWithRetry = () => {
+  mongoose.connect(MONGO_URI)
+    .then(async () => {
+      console.log("Connected to MongoDB successfully.");
+      console.log("Note: Run 'node scripts/createAdmin.js' to create the TPO admin account.");
+      
+      // Automatically clean up legacy indexes from old schemas if present
+      try {
+        const studentsColl = mongoose.connection.collection("students");
+        await studentsColl.dropIndex("prn_1").catch(() => {});
+        await studentsColl.dropIndex("username_1").catch(() => {});
+      } catch (_) {}
+    })
+    .catch(err => {
+      console.error("MongoDB connection error:", err.message);
+      console.log("Retrying MongoDB connection in 5 seconds...");
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+
+connectWithRetry();

@@ -191,12 +191,38 @@ router.put("/statistics", authenticateAdmin, async (req, res) => {
 
 // --- BRANCH CONFIG (registered student counts per branch) ---
 
-// GET all branch configs
+// GET all branch configs (auto-discovers unique branches from placement records if not present)
 router.get("/admin/branch-config", authenticateAdmin, async (req, res) => {
   try {
-    const configs = await BranchConfig.find({}).sort({ branch: 1 });
+    let configs = await BranchConfig.find({}).sort({ branch: 1 });
+
+    // Auto-discover any branches present in placement records or students that are missing from BranchConfig
+    const recordBranches = await PlacementRecord.distinct("branch");
+    const studentBranches = await PlacedStudent.distinct("branch");
+    const allUniqueBranches = [...new Set([...recordBranches, ...studentBranches].filter(Boolean))];
+
+    const existingBranchSet = new Set(configs.map(c => c.branch.toLowerCase()));
+    let addedNewBranch = false;
+
+    for (const b of allUniqueBranches) {
+      const trimmed = String(b).trim();
+      if (trimmed && !existingBranchSet.has(trimmed.toLowerCase())) {
+        await BranchConfig.updateOne(
+          { branch: trimmed },
+          { $setOnInsert: { branch: trimmed, registeredCount: 0 } },
+          { upsert: true }
+        );
+        addedNewBranch = true;
+      }
+    }
+
+    if (addedNewBranch) {
+      configs = await BranchConfig.find({}).sort({ branch: 1 });
+    }
+
     res.json(configs);
-  } catch {
+  } catch (err) {
+    console.error("Failed to fetch branch configs:", err);
     res.status(500).json({ message: "Failed to fetch branch configs" });
   }
 });
@@ -414,8 +440,8 @@ router.get("/admin/placement-records-analytics", authenticateAdmin, async (req, 
       ? Number((internshipWithStipend.reduce((acc, curr) => acc + (curr.stipend || 0), 0) / internshipWithStipend.length).toFixed(2))
       : 0;
 
-    // Branch Breakdown
-    const branchBreakdown = await PlacementRecord.aggregate([
+    // Branch Breakdown with BranchConfig registered count enrichment
+    const rawBranchBreakdown = await PlacementRecord.aggregate([
       {
         $group: {
           _id: "$branch",
@@ -469,6 +495,24 @@ router.get("/admin/placement-records-analytics", authenticateAdmin, async (req, 
       },
       { $sort: { branch: 1 } }
     ]);
+
+    const branchConfigsForAnalytics = await BranchConfig.find({});
+    const cfgMap = {};
+    branchConfigsForAnalytics.forEach(c => { cfgMap[c.branch.toLowerCase()] = c.registeredCount; });
+
+    const branchBreakdown = rawBranchBreakdown.map(item => {
+      const bKey = String(item.branch || "").trim().toLowerCase();
+      const cfgCount = cfgMap[bKey];
+      const registeredCount = (cfgCount !== undefined && cfgCount > 0) ? cfgCount : item.total;
+      const placementRate = registeredCount > 0 ? Number(((item.placed / registeredCount) * 100).toFixed(2)) : 0;
+      return {
+        ...item,
+        registeredCount,
+        totalStudents: registeredCount,
+        unplaced: Math.max(0, registeredCount - item.placed),
+        placementRate
+      };
+    });
 
     // Package Distribution categories
     let distUnder5 = 0;
@@ -869,6 +913,26 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
       }
     }
 
+    // Auto-ensure all branches from newly imported records exist in BranchConfig
+    try {
+      const recordBranches = await PlacementRecord.distinct("branch");
+      const studentBranches = await PlacedStudent.distinct("branch");
+      const allUniqueBranches = [...new Set([...recordBranches, ...studentBranches].filter(Boolean))];
+
+      for (const b of allUniqueBranches) {
+        const trimmed = String(b).trim();
+        if (trimmed) {
+          await BranchConfig.updateOne(
+            { branch: trimmed },
+            { $setOnInsert: { branch: trimmed, registeredCount: 0 } },
+            { upsert: true }
+          );
+        }
+      }
+    } catch (bcErr) {
+      console.error("Error auto-syncing branch configs after Excel import:", bcErr);
+    }
+
     res.json({
       summary: {
         totalRows,
@@ -881,7 +945,6 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
       },
       failedRows
     });
-
   } catch (error) {
     console.error("Excel import processing error:", error);
     res.status(500).json({ message: "Failed to process Excel import", error: error.message });
@@ -1203,25 +1266,39 @@ router.get("/admin/companies-stats", authenticateAdmin, async (req, res) => {
 // 7. Branch-wise Statistics API
 router.get("/admin/branches-stats", authenticateAdmin, async (req, res) => {
   try {
-    const students = await PlacedStudent.find({});
-    const branches = [...new Set(students.map(s => s.branch))];
+    const recordBranches = await PlacementRecord.distinct("branch");
+    const studentBranches = await PlacedStudent.distinct("branch");
+    const configDocs = await BranchConfig.find({});
+    
+    const configMap = {};
+    configDocs.forEach(c => { configMap[c.branch.toLowerCase()] = c.registeredCount; });
+
+    const allBranches = [...new Set([...recordBranches, ...studentBranches, ...configDocs.map(c => c.branch)].filter(Boolean))].sort();
 
     const stats = [];
-    for (const branch of branches) {
-      const branchStudents = students.filter(s => s.branch === branch);
-      const totalStudentsCount = branchStudents.length;
+    for (const branch of allBranches) {
+      const records = await PlacementRecord.find({ branch: { $regex: new RegExp(`^${branch.replace(/[-[\]{}()*+?.:=\\^$|#\s]/g, '\\$&')}$`, "i") } });
+      const students = await PlacedStudent.find({ branch: { $regex: new RegExp(`^${branch.replace(/[-[\]{}()*+?.:=\\^$|#\s]/g, '\\$&')}$`, "i") } });
 
-      const branchStudentIds = branchStudents.map(s => s._id);
-      const branchOffers = await PlacementOffer.find({ studentId: { $in: branchStudentIds } });
+      const placedFromRecords = records.filter(r => /Placed/i.test(r.placementStatus)).length;
       
-      const placedStudentIds = [...new Set(branchOffers.map(o => String(o.studentId)))];
-      const placedCount = placedStudentIds.length;
+      const studentIds = students.map(s => s._id);
+      const offers = await PlacementOffer.find({ studentId: { $in: studentIds } });
+      const placedStudentIds = [...new Set(offers.map(o => String(o.studentId)))];
       
-      const placementRate = totalStudentsCount > 0 ? (placedCount / totalStudentsCount) * 100 : 0;
+      const placedCount = Math.max(placedFromRecords, placedStudentIds.length);
+      const recordCount = Math.max(records.length, students.length);
+      
+      const configuredRegistered = configMap[branch.toLowerCase()];
+      const registeredCount = (configuredRegistered !== undefined && configuredRegistered > 0) 
+        ? configuredRegistered 
+        : recordCount;
 
-      const packages = branchOffers
-        .map(o => o.packageLpa)
-        .filter(p => p !== null && p !== undefined && typeof p === "number");
+      const placementRate = registeredCount > 0 ? (placedCount / registeredCount) * 100 : 0;
+
+      const recordSalaries = records.map(r => Math.max(r.salary1 || 0, r.salary2 || 0)).filter(s => s > 0);
+      const offerSalaries = offers.map(o => o.packageLpa).filter(p => typeof p === "number" && p > 0);
+      const packages = [...recordSalaries, ...offerSalaries];
 
       const avgPackage = packages.length > 0 ? (packages.reduce((a, b) => a + b, 0) / packages.length) : 0;
       const medianPackage = calculateMedianVal(packages) || 0;
@@ -1229,8 +1306,11 @@ router.get("/admin/branches-stats", authenticateAdmin, async (req, res) => {
 
       stats.push({
         branch,
-        totalStudents: totalStudentsCount,
+        registeredCount,
+        totalStudents: registeredCount,
+        recordCount,
         placedStudents: placedCount,
+        unplacedStudents: Math.max(0, registeredCount - placedCount),
         placementPercentage: parseFloat(placementRate.toFixed(2)),
         averagePackage: parseFloat(avgPackage.toFixed(2)),
         medianPackage: parseFloat(medianPackage.toFixed(2)),
