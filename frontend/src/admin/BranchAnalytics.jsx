@@ -5,7 +5,8 @@ import {
   Award, FileSpreadsheet, User, Check, Search,
   Building2, TrendingUp, Filter, ArrowUpDown, X,
   RotateCcw, LayoutGrid, Table as TableIcon,
-  GraduationCap, Users, Percent, ChevronRight, ChevronDown
+  GraduationCap, Users, Percent, ChevronRight, ChevronDown,
+  Sparkles, Layers
 } from "lucide-react";
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
@@ -23,6 +24,7 @@ export default function BranchAnalytics() {
 
   // Search, filter & sort state
   const [search, setSearch] = useState("");
+  const [breakdownSearch, setBreakdownSearch] = useState("");
   const [sortField, setSortField] = useState("placementPercentage");
   const [sortOrder, setSortOrder] = useState("desc");
   const [viewMode, setViewMode] = useState("auto"); // 'auto', 'table', 'grid'
@@ -64,17 +66,25 @@ export default function BranchAnalytics() {
     }
     const b = branchMap[branchName];
     b.totalStudents++;
+    
     if (s.offers && s.offers.length > 0) {
       b.placedStudents++;
       if (s.offers.length > 1) b.multipleOffers++;
       s.offers.forEach(o => {
         if (typeof o.packageLpa === "number") b.packages.push(o.packageLpa);
         if (o.companyName) b.companiesSet.add(o.companyName);
+        const statusStr = String(o.placementStatus || "").toLowerCase();
+        if (statusStr.includes("ppo")) b.ppos++;
+        if (statusStr.includes("inter") || statusStr.includes("intern") || statusStr.includes("ppo")) b.internships++;
       });
     }
+
     s.internships?.forEach(i => {
-      b.internships++;
-      if (i.ppo === "Yes") b.ppos++;
+      const hasOffer = s.offers?.some(o => o.companyName === i.companyName);
+      if (!hasOffer) {
+        b.internships++;
+        if (String(i.ppo || "").toLowerCase() === "yes" || String(i.status || "").toLowerCase().includes("ppo")) b.ppos++;
+      }
       if (i.companyName) b.companiesSet.add(i.companyName);
     });
   });
@@ -565,20 +575,104 @@ export default function BranchAnalytics() {
             <div style={{ flex: 1, position: "relative" }}><Bar data={companyDistributionData} options={chartOptions} /></div>
           </div>
 
-          <div className="card" style={{ minHeight: 320, display: "flex", flexDirection: "column", gap: 16 }}>
-            <h3 style={{ fontSize: 15, borderBottom: "1px solid var(--border-color)", paddingBottom: 10, margin: 0 }}>Company Recruitment Breakdown</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, overflowY: "auto", flex: 1 }}>
-              {sortedBranches.map((b, idx) => (
-                <div key={idx} style={{ padding: "8px 12px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.01)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <strong>{b.branchName}</strong>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{b.companyCount} Recruiter(s)</span>
+          {/* ULTRA REFINED COMPANY RECRUITMENT BREAKDOWN CARD */}
+          <div className="card" style={{ minHeight: 320, display: "flex", flexDirection: "column", gap: 16, gridColumn: "1 / -1" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: 12, flexWrap: "wrap", gap: 10 }}>
+              <div>
+                <h3 style={{ fontSize: 17, margin: 0, display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}>
+                  <Building2 size={20} style={{ color: "var(--primary)" }} /> Company Recruitment Breakdown by Department
+                </h3>
+                <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2, margin: "2px 0 0" }}>
+                  Interactive brand chips and recruiting companies for each academic branch.
+                </p>
+              </div>
+              <div style={{ position: "relative", minWidth: 200 }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Filter company chips..."
+                  value={breakdownSearch}
+                  onChange={(e) => setBreakdownSearch(e.target.value)}
+                  style={{ paddingLeft: 30, height: 34, fontSize: 12 }}
+                />
+                <Search size={12} style={{ position: "absolute", left: 10, top: 11, color: "var(--text-muted)" }} />
+                {breakdownSearch && (
+                  <button onClick={() => setBreakdownSearch("")} style={{ position: "absolute", right: 8, top: 8, background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 0 }}>
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Department Brand Chips Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+              {sortedBranches.map((b, idx) => {
+                const matchedCompanies = breakdownSearch.trim()
+                  ? b.companiesList.filter(c => c.toLowerCase().includes(breakdownSearch.toLowerCase()))
+                  : b.companiesList;
+
+                if (breakdownSearch.trim() && matchedCompanies.length === 0) return null;
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      padding: 16,
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "var(--radius-md)",
+                      background: "rgba(255,255,255,0.01)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--primary-glow)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <GraduationCap size={16} />
+                        </div>
+                        <strong style={{ fontSize: 15, color: "var(--text-primary)" }}>{b.branchName}</strong>
+                      </div>
+                      <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 12, background: "rgba(99,102,241,0.1)", color: "var(--primary)", fontWeight: 700 }}>
+                        {matchedCompanies.length} Recruiter(s)
+                      </span>
+                    </div>
+
+                    {/* Company Chips Pills Grid */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                      {matchedCompanies.length > 0 ? (
+                        matchedCompanies.map((cName, cIdx) => (
+                          <div
+                            key={cIdx}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: "4px 10px",
+                              borderRadius: 16,
+                              background: "var(--bg-secondary)",
+                              border: "1px solid var(--border-color)",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "var(--text-primary)",
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                              transition: "transform 0.1s ease"
+                            }}
+                          >
+                            <Building2 size={12} style={{ color: "var(--primary)" }} />
+                            {cName}
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>
+                          No matching recruiters recorded
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
-                    {b.companiesList.length > 0 ? b.companiesList.join(", ") : "No recruiters recorded"}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

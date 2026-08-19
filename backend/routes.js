@@ -717,8 +717,16 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
           }
         }
 
-        // Store Internship info separately
-        const isInternshipOffered = String(internshipOffered).trim().toLowerCase() === "yes";
+        // Store Internship & PPO info accurately (Handles 'Inter+ppo', 'PPO', 'Internship+PPO', etc.)
+        const statusClean = String(placementStatus).trim().toLowerCase();
+        const internOfferedClean = String(internshipOffered).trim().toLowerCase();
+
+        const hasPpoInStatus = statusClean.includes("ppo") || internOfferedClean.includes("ppo");
+        const hasInternInStatus = statusClean.includes("intern") || statusClean.includes("inter") || internOfferedClean === "yes" || internOfferedClean.includes("intern");
+
+        const isInternshipOffered = hasInternInStatus || hasPpoInStatus;
+        const ppoStatus = hasPpoInStatus ? "Yes" : "No";
+
         const intCompName = String(internshipCompany).trim() || String(company1Name).trim();
         
         if (isInternshipOffered && intCompName) {
@@ -730,7 +738,7 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
                 startDate: internshipStartDate,
                 endDate: internshipEndDate,
                 stipend: stipend,
-                ppo: "No",
+                ppo: ppoStatus,
                 status: "Active"
               },
               { upsert: true }
