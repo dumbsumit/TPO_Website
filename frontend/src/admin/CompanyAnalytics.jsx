@@ -5,7 +5,8 @@ import {
   Award, FileSpreadsheet, User, Check, Search,
   Building2, Briefcase, TrendingUp, Filter,
   ArrowUpDown, SlidersHorizontal, ArrowUpRight,
-  Users, ChevronRight, X, RotateCcw, LayoutGrid, Table as TableIcon
+  Users, ChevronRight, X, RotateCcw, LayoutGrid, Table as TableIcon,
+  Sparkles
 } from "lucide-react";
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
@@ -70,7 +71,7 @@ export default function CompanyAnalytics() {
     // Process ONLY PRIMARY (Company 1) offers for all stats
     s.offers?.forEach(o => {
       if (!o.companyName) return;
-      if (o.offerType !== "PRIMARY") return; // STRICTLY ONLY COMPANY 1 DATA
+      if (o.offerType !== "PRIMARY") return;
 
       const name = o.companyName.trim();
       const statusStr = String(o.placementStatus || "").toLowerCase();
@@ -236,7 +237,7 @@ export default function CompanyAnalytics() {
       datasets: [{
         label: "Students Recruited",
         data: branchLabels.map(b => raw.branchBreakdown[b]),
-        backgroundColor: "rgba(99, 102, 241, 0.8)",
+        backgroundColor: "rgba(99, 102, 241, 0.85)",
         borderColor: "#6366f1",
         borderWidth: 1,
         borderRadius: 6
@@ -256,16 +257,16 @@ export default function CompanyAnalytics() {
           <button
             onClick={() => { setSelectedCompany(null); setDetailStudentPage(1); }}
             className="btn btn-secondary"
-            style={{ padding: "6px 14px", fontSize: 13, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 8 }}
+            style={{ padding: "7px 16px", fontSize: 13, marginBottom: 14, display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 8, fontWeight: 600 }}
           >
             ← Back to Companies List
           </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--primary-glow)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Building2 size={24} />
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: "linear-gradient(135deg, var(--primary) 0%, #3730a3 100%)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 20 }}>
+              {comp.companyName.charAt(0)}
             </div>
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>{comp.companyName} Analytics</h2>
+              <h2 style={{ fontSize: 24, fontWeight: 800, color: "var(--text-primary)", margin: 0, letterSpacing: "-0.01em" }}>{comp.companyName} Analytics</h2>
               <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 2, margin: 0 }}>
                 Detailed placement performance, package breakdowns, and student lists for {comp.companyName}.
               </p>
@@ -273,7 +274,7 @@ export default function CompanyAnalytics() {
           </div>
         </div>
 
-        {/* Clean Stat Grid */}
+        {/* Clean Responsive Stat Grid */}
         <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, margin: 0, width: "100%", boxSizing: "border-box" }}>
           {[
             { icon: <User size={18} />, val: comp.totalStudents, label: "Students Placed", color: "var(--primary)", bg: "var(--primary-glow)" },
@@ -284,16 +285,16 @@ export default function CompanyAnalytics() {
             { icon: <FileSpreadsheet size={18} />, val: comp.internshipCount, label: "Internships", color: "var(--success)", bg: "rgba(16, 185, 129, 0.1)" },
             { icon: <Check size={18} />, val: comp.ppoCount, label: "PPOs Awarded", color: "var(--accent)", bg: "var(--accent-glow)" },
           ].map((item, idx) => (
-            <div key={idx} className="wce-stat-card" style={{ padding: 14, borderRadius: 10 }}>
+            <div key={idx} className="wce-stat-card" style={{ padding: 14, borderRadius: 12, background: "#ffffff", border: "1px solid var(--border-color)", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
               <div className="wce-stat-icon-wrapper" style={{ color: item.color, background: item.bg }}>{item.icon}</div>
-              <div className="wce-stat-info"><h3 style={{ fontSize: 17, fontWeight: 700 }}>{item.val}</h3><p style={{ fontSize: 11 }}>{item.label}</p></div>
+              <div className="wce-stat-info"><h3 style={{ fontSize: 17, fontWeight: 800 }}>{item.val}</h3><p style={{ fontSize: 11 }}>{item.label}</p></div>
             </div>
           ))}
         </div>
 
         {/* Branch Recruitment Breakdown Chart */}
         <div style={{ width: "100%", boxSizing: "border-box" }}>
-          <div className="card" style={{ height: 320, display: "flex", flexDirection: "column", padding: 20, borderRadius: 12 }}>
+          <div className="card" style={{ height: 320, display: "flex", flexDirection: "column", padding: 20, borderRadius: 14, background: "#ffffff" }}>
             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, borderBottom: "1px solid var(--border-color)", paddingBottom: 8, margin: "0 0 14px 0" }}>Branch Recruitment Breakdown</h3>
             <div style={{ flex: 1, position: "relative" }}>
               {branchLabels.length > 0 ? (
@@ -305,7 +306,7 @@ export default function CompanyAnalytics() {
           </div>
         </div>
 
-        <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, padding: 20, borderRadius: 12, width: "100%", boxSizing: "border-box" }}>
+        <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, padding: 20, borderRadius: 14, background: "#ffffff", width: "100%", boxSizing: "border-box" }}>
           <div>
             <h4 style={{ fontSize: 14, fontWeight: 700, color: "var(--primary)", borderBottom: "1px solid var(--border-color)", paddingBottom: 6, marginBottom: 10, margin: "0 0 10px 0" }}>Internship Statistics</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
@@ -324,7 +325,7 @@ export default function CompanyAnalytics() {
         </div>
 
         {/* Student Placements Table */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16, padding: 20, borderRadius: 12, width: "100%", boxSizing: "border-box" }}>
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16, padding: 20, borderRadius: 14, background: "#ffffff", width: "100%", boxSizing: "border-box" }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, borderBottom: "1px solid var(--border-color)", paddingBottom: 10, margin: 0 }}>Student Placements &amp; Interns</h3>
           {paginatedDetailStudents.length === 0 ? (
             <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 20 }}>No students found.</div>
@@ -348,7 +349,7 @@ export default function CompanyAnalytics() {
                           {student.offers && student.offers.length > 0 ? (
                             student.offers.map((o, oIdx) => (
                               <div key={oIdx} style={{ marginBottom: 4 }}>
-                                <strong>{o.offerType} Offer</strong>: {formatLPA(o.packageLpa)}
+                                <strong>Placement Offer</strong>: {formatLPA(o.packageLpa)}
                               </div>
                             ))
                           ) : "—"}
@@ -357,7 +358,7 @@ export default function CompanyAnalytics() {
                           {student.internships && student.internships.length > 0 ? (
                             student.internships.map((i, iIdx) => (
                               <div key={iIdx}>
-                                <strong>Intern</strong>: {i.stipend ? `₹${i.stipend.toLocaleString()}/mo` : "Yes"} (PPO: {i.ppo})
+                                <strong>Intern</strong> (PPO: {i.ppo})
                               </div>
                             ))
                           ) : "—"}
@@ -384,10 +385,10 @@ export default function CompanyAnalytics() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box" }}>
       {/* Header Banner */}
-      <div className="card" style={{ padding: 20, borderRadius: 12, display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box" }}>
+      <div className="card" style={{ padding: 22, borderRadius: 16, background: "#ffffff", display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box", border: "1px solid var(--border-color)", boxShadow: "0 4px 16px rgba(0,0,0,0.02)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <div style={{ flex: "1 1 240px" }}>
-            <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", color: "var(--text-primary)" }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", color: "var(--text-primary)" }}>
               <Building2 size={24} style={{ color: "var(--primary)" }} /> Companies Placement Analytics
             </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, margin: "4px 0 0" }}>
@@ -403,39 +404,39 @@ export default function CompanyAnalytics() {
 
         {/* Overview KPI Cards */}
         <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginTop: 4, width: "100%", boxSizing: "border-box" }}>
-          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 10 }}>
+          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
             <div className="wce-stat-icon-wrapper" style={{ color: "var(--primary)", background: "var(--primary-glow)" }}>
               <Building2 size={18} />
             </div>
             <div className="wce-stat-info">
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{totalCompaniesCount}</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 800 }}>{totalCompaniesCount}</h3>
               <p style={{ fontSize: 11 }}>Total Companies</p>
             </div>
           </div>
-          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 10 }}>
+          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
             <div className="wce-stat-icon-wrapper" style={{ color: "var(--success)", background: "rgba(16, 185, 129, 0.1)" }}>
               <Users size={18} />
             </div>
             <div className="wce-stat-info">
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{uniquePlacedStudentsCount}</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 800 }}>{uniquePlacedStudentsCount}</h3>
               <p style={{ fontSize: 11 }}>Placed Students ({totalJobOffersCount} Offers)</p>
             </div>
           </div>
-          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 10 }}>
+          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
             <div className="wce-stat-icon-wrapper" style={{ color: "var(--secondary)", background: "rgba(138, 63, 252, 0.1)" }}>
               <Award size={18} />
             </div>
             <div className="wce-stat-info">
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{formatLPA(highestPackageEver)}</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 800 }}>{formatLPA(highestPackageEver)}</h3>
               <p style={{ fontSize: 11 }}>Highest Package Offer</p>
             </div>
           </div>
-          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 10 }}>
+          <div className="wce-stat-card" style={{ padding: 14, borderRadius: 12, background: "var(--bg-secondary)", border: "1px solid var(--border-color)" }}>
             <div className="wce-stat-icon-wrapper" style={{ color: "var(--accent)", background: "var(--accent-glow)" }}>
               <Check size={18} />
             </div>
             <div className="wce-stat-info">
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>{totalPposCount}</h3>
+              <h3 style={{ fontSize: 18, fontWeight: 800 }}>{totalPposCount}</h3>
               <p style={{ fontSize: 11 }}>PPOs Converted</p>
             </div>
           </div>
@@ -443,7 +444,7 @@ export default function CompanyAnalytics() {
       </div>
 
       {/* Control Center Card */}
-      <div className="card" style={{ padding: 20, borderRadius: 12, display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box" }}>
+      <div className="card" style={{ padding: 20, borderRadius: 16, background: "#ffffff", border: "1px solid var(--border-color)", boxShadow: "0 4px 16px rgba(0,0,0,0.02)", display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box" }}>
         {/* Quick Filter Chips */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
@@ -460,8 +461,8 @@ export default function CompanyAnalytics() {
               type="button"
               onClick={() => setQuickFilter(badge.id)}
               style={{
-                padding: "5px 12px",
-                borderRadius: 16,
+                padding: "5px 14px",
+                borderRadius: 20,
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
@@ -633,7 +634,7 @@ export default function CompanyAnalytics() {
 
       {/* Main Companies Display Area */}
       {sortedCompanies.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, borderRadius: 12, width: "100%", boxSizing: "border-box" }}>
+        <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, borderRadius: 14, background: "#ffffff", border: "1px solid var(--border-color)", width: "100%", boxSizing: "border-box" }}>
           No recruiting companies found matching your filters.
         </div>
       ) : (
@@ -656,7 +657,8 @@ export default function CompanyAnalytics() {
                   className="card"
                   style={{
                     padding: 16,
-                    borderRadius: 12,
+                    borderRadius: 14,
+                    background: "#ffffff",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
@@ -670,15 +672,15 @@ export default function CompanyAnalytics() {
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--primary-glow)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Building2 size={20} />
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, var(--primary) 0%, #3730a3 100%)", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontWeight: 800, fontSize: 16 }}>
+                        {c.companyName.charAt(0)}
                       </div>
                       <div style={{ overflow: "hidden" }}>
                         <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {c.companyName}
                         </h3>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                          Primary: {c.primaryOffers} &bull; Sec: {c.secondaryOffers}
+                          {c.totalStudents} Students Recruited
                         </div>
                       </div>
                     </div>
@@ -688,7 +690,7 @@ export default function CompanyAnalytics() {
                   </div>
 
                   {/* Metrics Pill Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "var(--bg-secondary)", padding: 10, borderRadius: 8, fontSize: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "var(--bg-secondary)", padding: 10, borderRadius: 10, fontSize: 12 }}>
                     <div>
                       <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Avg Package</div>
                       <div style={{ fontWeight: 700, color: "var(--primary)", fontSize: 12, marginTop: 2 }}>
@@ -733,7 +735,7 @@ export default function CompanyAnalytics() {
 
           {/* DESKTOP STICKY DATA TABLE VIEW */}
           {(viewMode === "table" || viewMode === "auto") && (
-            <div className="card" style={{ padding: 16, borderRadius: 12, width: "100%", boxSizing: "border-box" }}>
+            <div className="card" style={{ padding: 16, borderRadius: 14, background: "#ffffff", border: "1px solid var(--border-color)", width: "100%", boxSizing: "border-box" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                 <TableIcon size={14} /> Full Metrics Spreadsheet View:
               </div>
@@ -765,12 +767,6 @@ export default function CompanyAnalytics() {
                       <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("ppoCount")}>
                         PPO Count {sortField === "ppoCount" && (sortOrder === "asc" ? "▲" : "▼")}
                       </th>
-                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("primaryOffers")}>
-                        Primary {sortField === "primaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
-                      </th>
-                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("secondaryOffers")}>
-                        Secondary {sortField === "secondaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
-                      </th>
                       <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center" }}>
                         Action
                       </th>
@@ -787,8 +783,6 @@ export default function CompanyAnalytics() {
                         <td>{formatLPA(c.lowestPackage)}</td>
                         <td style={{ textAlign: "center" }}>{c.internshipCount}</td>
                         <td style={{ textAlign: "center", fontWeight: 600, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)" }}>{c.ppoCount}</td>
-                        <td style={{ textAlign: "center" }}>{c.primaryOffers}</td>
-                        <td style={{ textAlign: "center" }}>{c.secondaryOffers}</td>
                         <td style={{ textAlign: "center" }}>
                           <button onClick={() => setSelectedCompany(c)} className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 11, height: 28, borderRadius: 6 }}>
                             Analyze Details
