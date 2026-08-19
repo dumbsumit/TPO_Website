@@ -55,7 +55,7 @@ export default function AdminDashboard() {
         </aside>
 
         {/* Tab Content */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 30, minWidth: 0, width: "100%", overflow: "hidden" }}>
           {activeTab === "excel"       && <ExcelImports />}
           {activeTab === "companies"   && <CompanyAnalytics />}
           {activeTab === "branches"    && <BranchAnalytics />}

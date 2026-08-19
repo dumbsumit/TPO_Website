@@ -251,7 +251,7 @@ export default function CompanyAnalytics() {
     );
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box" }}>
         <div>
           <button
             onClick={() => { setSelectedCompany(null); setDetailStudentPage(1); }}
@@ -273,7 +273,7 @@ export default function CompanyAnalytics() {
           </div>
         </div>
 
-        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, margin: 0 }}>
+        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, margin: 0, width: "100%", boxSizing: "border-box" }}>
           {[
             { icon: <User size={18} />, val: comp.totalStudents, label: "Students Placed", color: "var(--primary)", bg: "var(--primary-glow)" },
             { icon: <Award size={18} />, val: formatLPA(comp.averagePackage), label: "Average Package", color: "var(--success)", bg: "rgba(16, 185, 129, 0.1)" },
@@ -290,7 +290,7 @@ export default function CompanyAnalytics() {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, width: "100%", boxSizing: "border-box" }}>
           <div className="card" style={{ height: 320, display: "flex", flexDirection: "column" }}>
             <h3 style={{ fontSize: 15, marginBottom: 14, borderBottom: "1px solid var(--border-color)", paddingBottom: 8 }}>Package Distribution</h3>
             <div style={{ flex: 1, position: "relative" }}>
@@ -314,7 +314,7 @@ export default function CompanyAnalytics() {
           </div>
         </div>
 
-        <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+        <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, width: "100%", boxSizing: "border-box" }}>
           <div>
             <h4 style={{ fontSize: 14, color: "var(--primary)", borderBottom: "1px solid var(--border-color)", paddingBottom: 6, marginBottom: 10 }}>Internship Statistics</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
@@ -333,13 +333,13 @@ export default function CompanyAnalytics() {
           </div>
         </div>
 
-        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box" }}>
           <h3 style={{ fontSize: 17, borderBottom: "1px solid var(--border-color)", paddingBottom: 10, margin: 0 }}>Student Placements &amp; Interns</h3>
           {paginatedDetailStudents.length === 0 ? (
             <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 20 }}>No students found.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div className="table-container" style={{ overflowX: "auto" }}>
+              <div className="table-container" style={{ overflowX: "auto", width: "100%" }}>
                 <table className="data-table" style={{ width: "100%", minWidth: 600 }}>
                   <thead>
                     <tr>
@@ -391,27 +391,27 @@ export default function CompanyAnalytics() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%", maxWidth: "100%", overflowX: "hidden", boxSizing: "border-box" }}>
       {/* Header Banner */}
-      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: "1 1 240px" }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <Building2 size={24} style={{ color: "var(--primary)" }} /> Companies Placement Analytics
             </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, margin: "4px 0 0" }}>
               Comprehensive performance breakdown, average salaries, and recruiting statistics for all companies.
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, background: "rgba(99,102,241,0.12)", color: "var(--primary)", fontWeight: 700, border: "1px solid rgba(99,102,241,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, background: "rgba(99,102,241,0.12)", color: "var(--primary)", fontWeight: 700, border: "1px solid rgba(99,102,241,0.2)", whiteSpace: "nowrap" }}>
               {total} Recruiting Companies
             </span>
           </div>
         </div>
 
         {/* Overview KPI Cards */}
-        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 4 }}>
+        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginTop: 4, width: "100%", boxSizing: "border-box" }}>
           <div className="wce-stat-card" style={{ padding: 14 }}>
             <div className="wce-stat-icon-wrapper" style={{ color: "var(--primary)", background: "var(--primary-glow)" }}>
               <Building2 size={18} />
@@ -452,7 +452,7 @@ export default function CompanyAnalytics() {
       </div>
 
       {/* Main Search & Filter Control Center Card */}
-      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, width: "100%", boxSizing: "border-box" }}>
         {/* Quick Filter Badges */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
@@ -485,20 +485,20 @@ export default function CompanyAnalytics() {
           ))}
         </div>
 
-        {/* Detailed Controls Grid */}
-        <div className="filter-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, margin: 0, padding: 0, border: "none", background: "none" }}>
+        {/* Detailed Controls Flex Wrap Grid */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, width: "100%", boxSizing: "border-box" }}>
           
           {/* Search Box */}
-          <div className="form-group">
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Search Company</label>
-            <div style={{ position: "relative" }}>
+          <div style={{ flex: "1 1 160px", minWidth: 150 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>Search Company</label>
+            <div style={{ position: "relative", width: "100%" }}>
               <input
                 type="text"
                 className="form-control"
                 placeholder="Type company name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ paddingLeft: 34, height: 38, fontSize: 13 }}
+                style={{ paddingLeft: 34, height: 38, fontSize: 13, width: "100%", boxSizing: "border-box" }}
               />
               <Search size={14} style={{ position: "absolute", left: 11, top: 12, color: "var(--text-muted)" }} />
               {search && (
@@ -513,33 +513,31 @@ export default function CompanyAnalytics() {
           </div>
 
           {/* Sort Field Selector */}
-          <div className="form-group">
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Sort Field</label>
-            <div style={{ position: "relative" }}>
-              <select
-                className="form-control"
-                value={sortField}
-                onChange={(e) => setSortField(e.target.value)}
-                style={{ height: 38, fontSize: 13, fontWeight: 600 }}
-              >
-                <option value="totalStudents">Total Students Placed</option>
-                <option value="companyName">Company Name (A-Z)</option>
-                <option value="averagePackage">Average Package (LPA)</option>
-                <option value="highestPackage">Highest Package (LPA)</option>
-                <option value="ppoCount">PPO Offers Count</option>
-                <option value="internshipCount">Internships Count</option>
-              </select>
-            </div>
+          <div style={{ flex: "1 1 150px", minWidth: 140 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>Sort Field</label>
+            <select
+              className="form-control"
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value)}
+              style={{ height: 38, fontSize: 13, fontWeight: 600, width: "100%", boxSizing: "border-box" }}
+            >
+              <option value="totalStudents">Total Students Placed</option>
+              <option value="companyName">Company Name (A-Z)</option>
+              <option value="averagePackage">Average Package (LPA)</option>
+              <option value="highestPackage">Highest Package (LPA)</option>
+              <option value="ppoCount">PPO Offers Count</option>
+              <option value="internshipCount">Internships Count</option>
+            </select>
           </div>
 
           {/* Sort Direction Toggle */}
-          <div className="form-group">
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Sort Order</label>
+          <div style={{ flex: "1 1 140px", minWidth: 130 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>Sort Order</label>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => setSortOrder(order => order === "asc" ? "desc" : "asc")}
-              style={{ height: 38, width: "100%", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+              style={{ height: 38, width: "100%", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, boxSizing: "border-box" }}
             >
               <ArrowUpDown size={14} />
               {sortOrder === "desc" ? "High to Low (Desc)" : "Low to High (Asc)"}
@@ -547,9 +545,9 @@ export default function CompanyAnalytics() {
           </div>
 
           {/* Package Filter */}
-          <div className="form-group">
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Avg Package Range</label>
-            <select className="form-control" value={selectedPackageRange} onChange={(e) => setSelectedPackageRange(e.target.value)} style={{ height: 38, fontSize: 13 }}>
+          <div style={{ flex: "1 1 130px", minWidth: 120 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>Avg Package Range</label>
+            <select className="form-control" value={selectedPackageRange} onChange={(e) => setSelectedPackageRange(e.target.value)} style={{ height: 38, fontSize: 13, width: "100%", boxSizing: "border-box" }}>
               <option value="">All Avg Packages</option>
               <option value="< 5">&lt; 5 LPA</option>
               <option value="5-10">5 - 10 LPA</option>
@@ -559,9 +557,9 @@ export default function CompanyAnalytics() {
           </div>
 
           {/* PPO Filter */}
-          <div className="form-group">
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>PPO Offered</label>
-            <select className="form-control" value={selectedHasPpo} onChange={(e) => setSelectedHasPpo(e.target.value)} style={{ height: 38, fontSize: 13 }}>
+          <div style={{ flex: "1 1 120px", minWidth: 110 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>PPO Offered</label>
+            <select className="form-control" value={selectedHasPpo} onChange={(e) => setSelectedHasPpo(e.target.value)} style={{ height: 38, fontSize: 13, width: "100%", boxSizing: "border-box" }}>
               <option value="">All Companies</option>
               <option value="Yes">Has PPO Offers</option>
               <option value="No">No PPO Offers</option>
@@ -569,9 +567,9 @@ export default function CompanyAnalytics() {
           </div>
 
           {/* Internship Filter */}
-          <div className="form-group">
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Internships Offered</label>
-            <select className="form-control" value={selectedHasInternship} onChange={(e) => setSelectedHasInternship(e.target.value)} style={{ height: 38, fontSize: 13 }}>
+          <div style={{ flex: "1 1 130px", minWidth: 120 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>Internships Offered</label>
+            <select className="form-control" value={selectedHasInternship} onChange={(e) => setSelectedHasInternship(e.target.value)} style={{ height: 38, fontSize: 13, width: "100%", boxSizing: "border-box" }}>
               <option value="">All Companies</option>
               <option value="Yes">Has Internships</option>
               <option value="No">No Internships</option>
@@ -645,18 +643,20 @@ export default function CompanyAnalytics() {
 
       {/* Main Companies Display Area */}
       {sortedCompanies.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>
+        <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40, width: "100%", boxSizing: "border-box" }}>
           No recruiting companies found matching your filters.
         </div>
       ) : (
-        <div>
+        <div style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
           {/* MOBILE CENTRIC CARDS GRID VIEW (Active when viewMode is 'grid' or on mobile screens) */}
           {(viewMode === "grid" || viewMode === "auto") && (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))",
                 gap: 16,
+                width: "100%",
+                boxSizing: "border-box",
                 marginBottom: viewMode === "auto" ? 24 : 0
               }}
             >
@@ -672,17 +672,18 @@ export default function CompanyAnalytics() {
                     gap: 14,
                     border: "1px solid var(--border-color)",
                     transition: "transform 0.15s ease, box-shadow 0.15s ease",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    boxSizing: "border-box"
                   }}
                   onClick={() => setSelectedCompany(c)}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
                       <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--primary-glow)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Building2 size={20} />
                       </div>
-                      <div>
-                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                      <div style={{ overflow: "hidden" }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {c.companyName}
                         </h3>
                         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
@@ -690,7 +691,7 @@ export default function CompanyAnalytics() {
                         </div>
                       </div>
                     </div>
-                    <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 12, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 700 }}>
+                    <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 12, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}>
                       {c.totalStudents} Placed
                     </span>
                   </div>
@@ -699,25 +700,25 @@ export default function CompanyAnalytics() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "var(--bg-secondary)", padding: 10, borderRadius: 8, fontSize: 12 }}>
                     <div>
                       <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Avg Package</div>
-                      <div style={{ fontWeight: 700, color: "var(--primary)", fontSize: 13, marginTop: 2 }}>
+                      <div style={{ fontWeight: 700, color: "var(--primary)", fontSize: 12, marginTop: 2 }}>
                         {formatLPA(c.averagePackage)}
                       </div>
                     </div>
                     <div>
                       <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Highest Package</div>
-                      <div style={{ fontWeight: 700, color: "var(--secondary)", fontSize: 13, marginTop: 2 }}>
+                      <div style={{ fontWeight: 700, color: "var(--secondary)", fontSize: 12, marginTop: 2 }}>
                         {formatLPA(c.highestPackage)}
                       </div>
                     </div>
                     <div>
                       <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>PPOs Awarded</div>
-                      <div style={{ fontWeight: 700, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)", fontSize: 13, marginTop: 2 }}>
+                      <div style={{ fontWeight: 700, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)", fontSize: 12, marginTop: 2 }}>
                         {c.ppoCount}
                       </div>
                     </div>
                     <div>
                       <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Internships</div>
-                      <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 13, marginTop: 2 }}>
+                      <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 12, marginTop: 2 }}>
                         {c.internshipCount}
                       </div>
                     </div>
@@ -741,12 +742,12 @@ export default function CompanyAnalytics() {
 
           {/* DESKTOP STICKY DATA TABLE VIEW (Active when viewMode is 'table' or 'auto') */}
           {(viewMode === "table" || viewMode === "auto") && (
-            <div className="card" style={{ padding: 16 }}>
+            <div className="card" style={{ padding: 16, width: "100%", boxSizing: "border-box" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
                 <TableIcon size={14} /> Full Metrics Spreadsheet View:
               </div>
-              <div className="table-container" style={{ maxHeight: "520px", overflowY: "auto", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}>
-                <table className="data-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 750 }}>
+              <div className="table-container" style={{ maxHeight: "520px", overflowY: "auto", overflowX: "auto", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", width: "100%", boxSizing: "border-box" }}>
+                <table className="data-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 700 }}>
                   <thead>
                     <tr>
                       <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("companyName")}>
