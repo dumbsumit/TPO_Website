@@ -19,9 +19,14 @@ export default function CompanyAnalytics() {
 
   const [selectedCompany, setSelectedCompany] = useState(null);
 
+  // Search, filter, and sort state
   const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const [selectedPackageRange, setSelectedPackageRange] = useState("");
+  const [selectedHasPpo, setSelectedHasPpo] = useState("");
+  const [selectedHasInternship, setSelectedHasInternship] = useState("");
+
+  const [sortField, setSortField] = useState("totalStudents");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   const [detailStudentPage, setDetailStudentPage] = useState(1);
   const detailItemsPerPage = 5;
@@ -116,19 +121,67 @@ export default function CompanyAnalytics() {
       secondaryOffers: comp.secondaryOffers,
       raw: comp
     };
-  }).sort((a, b) => b.totalStudents - a.totalStudents);
+  });
 
   const formatLPA = (val) => {
     if (val === null || val === undefined || isNaN(val)) return "—";
     return `${parseFloat(Number(val).toFixed(2))} LPA`;
   };
 
-  const filteredCompanies = companyStatsList.filter(c =>
-    c.companyName.toLowerCase().includes(search.toLowerCase())
-  );
-  const total = filteredCompanies.length;
-  const pages = Math.ceil(total / itemsPerPage);
-  const paginatedCompanies = filteredCompanies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(order => order === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  };
+
+  const filteredCompanies = companyStatsList.filter(c => {
+    if (search.trim()) {
+      if (!c.companyName.toLowerCase().includes(search.toLowerCase())) return false;
+    }
+    if (selectedPackageRange) {
+      const avg = c.averagePackage || 0;
+      if (selectedPackageRange === "< 5" && (avg === 0 || avg >= 5)) return false;
+      if (selectedPackageRange === "5-10" && (avg < 5 || avg >= 10)) return false;
+      if (selectedPackageRange === "10-15" && (avg < 10 || avg >= 15)) return false;
+      if (selectedPackageRange === "> 15" && avg < 15) return false;
+    }
+    if (selectedHasPpo) {
+      if (selectedHasPpo === "Yes" && c.ppoCount <= 0) return false;
+      if (selectedHasPpo === "No" && c.ppoCount > 0) return false;
+    }
+    if (selectedHasInternship) {
+      if (selectedHasInternship === "Yes" && c.internshipCount <= 0) return false;
+      if (selectedHasInternship === "No" && c.internshipCount > 0) return false;
+    }
+    return true;
+  });
+
+  const sortedCompanies = [...filteredCompanies].sort((a, b) => {
+    let aVal = a[sortField];
+    let bVal = b[sortField];
+    if (aVal === null || aVal === undefined) aVal = typeof bVal === "number" ? -1 : "";
+    if (bVal === null || bVal === undefined) bVal = typeof aVal === "number" ? -1 : "";
+
+    if (typeof aVal === "string") {
+      return sortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    } else {
+      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+    }
+  });
+
+  const total = sortedCompanies.length;
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setSelectedPackageRange("");
+    setSelectedHasPpo("");
+    setSelectedHasInternship("");
+    setSortField("totalStudents");
+    setSortOrder("desc");
+  };
 
   if (loading) {
     return <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 60 }}>Loading company analytics...</div>;
@@ -316,43 +369,107 @@ export default function CompanyAnalytics() {
         <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Unique Recruiting Companies: <strong>{total}</strong></span>
       </div>
 
-      <div style={{ display: "flex", gap: 16 }}>
-        <div style={{ position: "relative", flex: 1 }}>
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Search company name..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-            style={{ paddingLeft: 32, height: 38 }}
-          />
-          <Search size={12} style={{ position: "absolute", left: 10, top: 13, color: "var(--text-muted)" }} />
+      {/* Filter and Search controls bar */}
+      <div className="filter-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, margin: 0, padding: 0, border: "none", background: "none" }}>
+        <div className="form-group">
+          <label>Search Company</label>
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search company name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ paddingLeft: 32, height: 38 }}
+            />
+            <Search size={12} style={{ position: "absolute", left: 10, top: 13, color: "var(--text-muted)" }} />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Avg Package Range</label>
+          <select className="form-control" value={selectedPackageRange} onChange={(e) => setSelectedPackageRange(e.target.value)} style={{ height: 38 }}>
+            <option value="">All Avg Packages</option>
+            <option value="< 5">&lt; 5 LPA</option>
+            <option value="5-10">5 - 10 LPA</option>
+            <option value="10-15">10 - 15 LPA</option>
+            <option value="> 15">&gt; 15 LPA</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>PPO Offered</label>
+          <select className="form-control" value={selectedHasPpo} onChange={(e) => setSelectedHasPpo(e.target.value)} style={{ height: 38 }}>
+            <option value="">All</option>
+            <option value="Yes">Has PPO Offers</option>
+            <option value="No">No PPO Offers</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Internship Offered</label>
+          <select className="form-control" value={selectedHasInternship} onChange={(e) => setSelectedHasInternship(e.target.value)} style={{ height: 38 }}>
+            <option value="">All</option>
+            <option value="Yes">Has Internships</option>
+            <option value="No">No Internships</option>
+          </select>
         </div>
       </div>
 
-      {paginatedCompanies.length === 0 ? (
-        <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>No recruiting companies found matching your search.</div>
+      {(search || selectedPackageRange || selectedHasPpo || selectedHasInternship) && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button className="btn btn-secondary" onClick={handleResetFilters} style={{ padding: "6px 16px", fontSize: 12 }}>
+            Reset Filters
+          </button>
+        </div>
+      )}
+
+      {sortedCompanies.length === 0 ? (
+        <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>No recruiting companies found matching your filters.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="table-container">
-            <table className="data-table">
+          {/* Scrollable Container with sticky headers */}
+          <div className="table-container" style={{ maxHeight: "550px", overflowY: "auto", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}>
+            <table className="data-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
               <thead>
                 <tr>
-                  <th>Company Name</th>
-                  <th style={{ textAlign: "center" }}>Total Students</th>
-                  <th>Average Package</th>
-                  <th>Median Package</th>
-                  <th>Highest Package</th>
-                  <th>Lowest Package</th>
-                  <th style={{ textAlign: "center" }}>Internship Count</th>
-                  <th style={{ textAlign: "center" }}>PPO Count</th>
-                  <th style={{ textAlign: "center" }}>Primary Offers</th>
-                  <th style={{ textAlign: "center" }}>Secondary Offers</th>
-                  <th style={{ textAlign: "center" }}>Action</th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("companyName")}>
+                    Company Name {sortField === "companyName" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("totalStudents")}>
+                    Total Students {sortField === "totalStudents" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("averagePackage")}>
+                    Average Package {sortField === "averagePackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("medianPackage")}>
+                    Median Package {sortField === "medianPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("highestPackage")}>
+                    Highest Package {sortField === "highestPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("lowestPackage")}>
+                    Lowest Package {sortField === "lowestPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("internshipCount")}>
+                    Internships {sortField === "internshipCount" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("ppoCount")}>
+                    PPO Count {sortField === "ppoCount" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("primaryOffers")}>
+                    Primary {sortField === "primaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("secondaryOffers")}>
+                    Secondary {sortField === "secondaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
+                  </th>
+                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center" }}>
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedCompanies.map((c, idx) => (
+                {sortedCompanies.map((c, idx) => (
                   <tr key={idx}>
                     <td style={{ fontWeight: 600 }}>{c.companyName}</td>
                     <td style={{ textAlign: "center", fontWeight: 600 }}>{c.totalStudents}</td>
@@ -374,14 +491,6 @@ export default function CompanyAnalytics() {
               </tbody>
             </table>
           </div>
-
-          {pages > 1 && (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 10 }}>
-              <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="btn btn-secondary" style={{ padding: "6px 12px", fontSize: 12 }}>Previous</button>
-              <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Page <strong>{currentPage}</strong> of {pages}</span>
-              <button disabled={currentPage === pages} onClick={() => setCurrentPage(p => Math.min(pages, p + 1))} className="btn btn-secondary" style={{ padding: "6px 12px", fontSize: 12 }}>Next</button>
-            </div>
-          )}
         </div>
       )}
     </div>
