@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import multer from "multer";
 import xlsx from "xlsx";
-import { Company, Experience, GlobalStats, Admin, YearlyStats, PlacedStudent, PlacementOffer, Internship, PlacementRecord, BranchConfig } from "./models.js";
+import { Company, Experience, GlobalStats, Admin, YearlyStats, PlacedStudent, PlacementOffer, Internship, PlacementRecord, BranchConfig, UploadLog } from "./models.js";
 import { parseCompaniesExcel, parsePlacementRecordsExcel } from "./excelHelper.js";
 import { authenticateAdmin } from "./middleware/auth.js";
 
@@ -933,8 +933,28 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
       console.error("Error auto-syncing branch configs after Excel import:", bcErr);
     }
 
+    // Save upload log to database
+    let logEntry = null;
+    try {
+      logEntry = await UploadLog.create({
+        fileName: req.file.originalname || "Placement_Records.xlsx",
+        fileType: "Student Placement Records Excel",
+        fileSize: req.file.size || 0,
+        totalRows,
+        successfullyImported,
+        updatedRecords,
+        failedRecords,
+        duplicateRecords,
+        uploadedBy: "TPO Admin"
+      });
+    } catch (logErr) {
+      console.error("Error creating upload log:", logErr);
+    }
+
     res.json({
+      fileName: req.file.originalname,
       summary: {
+        fileName: req.file.originalname,
         totalRows,
         successfullyImported,
         updatedRecords,
@@ -943,11 +963,24 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
         duplicateRecords,
         invalidRecords: failedRecords
       },
-      failedRows
+      failedRows,
+      logEntry
     });
   } catch (error) {
     console.error("Excel import processing error:", error);
     res.status(500).json({ message: "Failed to process Excel import", error: error.message });
+  }
+});
+
+// GET upload logs / last uploaded excel file details
+router.get("/admin/upload-logs", authenticateAdmin, async (req, res) => {
+  try {
+    const logs = await UploadLog.find({}).sort({ createdAt: -1 }).limit(20);
+    const latest = logs[0] || null;
+    res.json({ logs, latest });
+  } catch (err) {
+    console.error("Error fetching upload logs:", err);
+    res.status(500).json({ message: "Failed to fetch upload logs" });
   }
 });
 

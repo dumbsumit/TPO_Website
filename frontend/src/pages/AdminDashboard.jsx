@@ -43,6 +43,20 @@ export default function AdminDashboard() {
   const [placementFileName, setPlacementFileName] = useState("");
   const [selectedExcelFile, setSelectedExcelFile] = useState(null);
 
+  // Excel Upload Logs state
+  const [uploadLogs, setUploadLogs] = useState([]);
+  const [latestUpload, setLatestUpload] = useState(null);
+
+  const loadUploadLogs = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_URL}/admin/upload-logs`, { withCredentials: true });
+      setUploadLogs(res.data?.logs || []);
+      setLatestUpload(res.data?.latest || null);
+    } catch (err) {
+      console.error("Failed to load upload logs:", err);
+    }
+  }, [API_URL]);
+
   // Branch Config state
   const [branchConfigs, setBranchConfigs] = useState([]);      // [{branch, registeredCount, _id}]
   const [branchEdits, setBranchEdits]   = useState({});        // {_id|branch -> editedCount}
@@ -50,6 +64,7 @@ export default function AdminDashboard() {
   const [newBranch, setNewBranch]       = useState("");         // dynamic input/select value
   const [newCount, setNewCount]         = useState("");
   const [branchAdding, setBranchAdding] = useState(false);
+
 
   // Fetch dashboard data
   const loadDashboardData = useCallback(async () => {
@@ -179,6 +194,7 @@ export default function AdminDashboard() {
       }
       await loadBranchConfigs();
       await loadDashboardData();
+      await loadUploadLogs();
       showToast("Spreadsheet data & branch registered counts verified and saved! Analysis complete.", "success");
     } catch (err) {
       console.error("Submission error:", err);
@@ -191,7 +207,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadDashboardData();
     loadBranchConfigs();
-  }, [loadDashboardData, loadBranchConfigs]);
+    loadUploadLogs();
+  }, [loadDashboardData, loadBranchConfigs, loadUploadLogs]);
 
   // Helper to generate template download links
   const downloadTemplate = () => {
@@ -336,36 +353,105 @@ export default function AdminDashboard() {
                 <h3 style={{ fontSize: 16, marginBottom: 12, display: "flex", alignItems: "center", justifyItems: "center", gap: 8 }}>
                   <Award size={16} style={{ color: "var(--primary)" }} /> Bulk Import Detailed Student Placement Records
                 </h3>
-                
-                <div 
-                  className="excel-dropzone" 
-                  onClick={() => placementFileRef.current?.click()}
-                >
-                  <Upload className="excel-dropzone-icon" size={32} style={{ color: "var(--primary)" }} />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                      {placementFileName || "Drag & Drop or Click to Select Student Records Excel/CSV"}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                      Required columns match the download template (PRN, Branch, Name, salaries, status).
+
+                {/* Active Uploaded Excel File Banner */}
+                {latestUpload && (
+                  <div style={{ 
+                    border: "1px solid rgba(99, 102, 241, 0.3)", 
+                    borderRadius: "var(--radius-md)", 
+                    padding: 16, 
+                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)", 
+                    marginBottom: 18 
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 42, height: 42, borderRadius: 10, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
+                          <FileSpreadsheet size={22} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            Active Uploaded Excel File
+                          </div>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginTop: 2, display: "flex", alignItems: "center", gap: 10 }}>
+                            {latestUpload.fileName}
+                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 600 }}>
+                              Ingested & Live
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+                            Uploaded on {new Date(latestUpload.createdAt).toLocaleString()} &bull; {latestUpload.totalRows} total rows ({latestUpload.successfullyImported} new, {latestUpload.updatedRecords} updated)
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <input
-                    type="file"
-                    ref={placementFileRef}
-                    style={{ display: "none" }}
-                    accept=".xlsx, .xls, .csv"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (!file) return;
+                )}
+                
+                {/* Excel File Dropzone / Selected File Preview */}
+                {selectedExcelFile ? (
+                  <div 
+                    className="excel-dropzone" 
+                    style={{ borderStyle: "solid", borderColor: "var(--primary)", background: "rgba(99, 102, 241, 0.06)", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 8, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <FileSpreadsheet size={20} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                          Selected File: {selectedExcelFile.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                          Size: {(selectedExcelFile.size / 1024).toFixed(1)} KB &bull; Ready to process. Review branch counts below and click 'Verify & Submit'.
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedExcelFile(null);
+                        setPlacementFileName("");
+                        if (placementFileRef.current) placementFileRef.current.value = "";
+                      }}
+                      style={{ background: "rgba(239, 68, 68, 0.12)", border: "none", color: "var(--danger)", padding: 6, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Clear selected file"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    className="excel-dropzone" 
+                    onClick={() => placementFileRef.current?.click()}
+                    style={{ marginBottom: 14 }}
+                  >
+                    <Upload className="excel-dropzone-icon" size={32} style={{ color: "var(--primary)" }} />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                        Drag & Drop or Click to Select Student Records Excel/CSV
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                        Required columns match the download template (PRN, Branch, Name, salaries, status).
+                      </div>
+                    </div>
+                    <input
+                      type="file"
+                      ref={placementFileRef}
+                      style={{ display: "none" }}
+                      accept=".xlsx, .xls, .csv"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
 
-                      setSelectedExcelFile(file);
-                      setPlacementFileName(`Selected: ${file.name} (Click 'Verify & Submit' below to process)`);
-                      showToast(`File "${file.name}" selected. Review branch counts below and click 'Verify & Submit'.`, "info");
-                    }}
-                    disabled={loading}
-                  />
-                </div>
+                        setSelectedExcelFile(file);
+                        setPlacementFileName(file.name);
+                        showToast(`File "${file.name}" selected. Review branch counts below and click 'Verify & Submit'.`, "info");
+                      }}
+                      disabled={loading}
+                    />
+                  </div>
+                )}
                 
                 <button 
                   type="button" 
@@ -383,7 +469,13 @@ export default function AdminDashboard() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <CheckCircle size={18} style={{ color: "var(--success)" }} />
-                          <h4 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Spreadsheet Ingestion Summary</h4>
+                          <div>
+                            <h4 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Spreadsheet Ingestion Summary</h4>
+                            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                              <FileSpreadsheet size={14} style={{ color: "var(--primary)" }} />
+                              <strong>Uploaded File:</strong> {importResult.fileName || importResult.summary?.fileName || latestUpload?.fileName || "Placement Spreadsheet"}
+                            </div>
+                          </div>
                         </div>
                         <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 12, background: "rgba(16,185,129,0.15)", color: "var(--success)", fontWeight: 600 }}>
                           Sheet Uploaded Successfully
@@ -541,6 +633,70 @@ export default function AdminDashboard() {
                       Verify & Submit Data for Placement Analysis
                     </button>
                   </div>
+
+                  {/* 4. Uploaded Excel Files History Log Table */}
+                  {uploadLogs.length > 0 && (
+                    <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--bg-secondary)", marginTop: 10 }}>
+                      <div style={{ padding: "14px 20px", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <FileSpreadsheet size={16} style={{ color: "var(--primary)" }} />
+                          <div>
+                            <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Uploaded Excel Files History Log</h3>
+                            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
+                              Record of all Excel and CSV files uploaded and processed by the admin.
+                            </p>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 10, background: "rgba(99,102,241,0.15)", color: "var(--accent)", fontWeight: 600 }}>
+                          {uploadLogs.length} File{uploadLogs.length > 1 ? "s" : ""} Ingested
+                        </span>
+                      </div>
+
+                      <div style={{ padding: "0 20px", overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", margin: "10px 0" }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
+                              <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>File Name</th>
+                              <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Uploaded On</th>
+                              <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Total Rows</th>
+                              <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>New Records</th>
+                              <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Updated Records</th>
+                              <th style={{ textAlign: "right", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {uploadLogs.map(log => (
+                              <tr key={log._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                <td style={{ padding: "10px 0", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <FileSpreadsheet size={15} style={{ color: "var(--success)" }} />
+                                    {log.fileName}
+                                  </div>
+                                </td>
+                                <td style={{ padding: "10px 0", fontSize: 12, color: "var(--text-secondary)" }}>
+                                  {new Date(log.createdAt).toLocaleString()}
+                                </td>
+                                <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600 }}>
+                                  {log.totalRows}
+                                </td>
+                                <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--success)" }}>
+                                  {log.successfullyImported}
+                                </td>
+                                <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--accent)" }}>
+                                  {log.updatedRecords}
+                                </td>
+                                <td style={{ padding: "10px 0", textAlign: "right" }}>
+                                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 600 }}>
+                                    Ingested
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -662,7 +818,15 @@ export default function AdminDashboard() {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: 800 }}>
             <div className="modal-header">
-              <h3 style={{ fontSize: 18, color: "var(--success)" }}>Spreadsheet Import Summary</h3>
+              <div>
+                <h3 style={{ fontSize: 18, color: "var(--success)", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+                  <CheckCircle size={20} /> Spreadsheet Import Summary
+                </h3>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  <FileSpreadsheet size={15} style={{ color: "var(--primary)" }} />
+                  <strong>Uploaded File:</strong> {importResult.fileName || importResult.summary?.fileName || latestUpload?.fileName || "Spreadsheet"}
+                </div>
+              </div>
               <button 
                 onClick={() => setImportResult(null)} 
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)" }}

@@ -41,14 +41,25 @@ export default function App() {
         script?.addEventListener("load", initGoogleAuth, { once: true });
       }
 
-      const results = await Promise.allSettled([
-          fetch(`${API_URL}/auth/admin/me`,   { credentials: "include" }).catch(() => null),
-          fetch(`${API_URL}/auth/student/me`, { credentials: "include" }).catch(() => null),
-        ]);
-        const [adminRes, studentRes] = results.map(r => r.value ?? null);
-        try { if (adminRes?.ok)   setAdminUser(await adminRes.json());   } catch { /**/ }
-        try { if (studentRes?.ok) setStudentUser(await studentRes.json()); } catch { /**/ }
-        setSessionLoading(false);
+      try {
+        const adminRes = await fetch(`${API_URL}/auth/admin/me`, { credentials: "include" });
+        if (adminRes.ok) {
+          const adminData = await adminRes.json();
+          setAdminUser(adminData);
+          setSessionLoading(false);
+          return;
+        }
+      } catch { /* ignore */ }
+
+      try {
+        const studentRes = await fetch(`${API_URL}/auth/student/me`, { credentials: "include" });
+        if (studentRes.ok) {
+          const studentData = await studentRes.json();
+          setStudentUser(studentData);
+        }
+      } catch { /* ignore */ }
+
+      setSessionLoading(false);
     };
     restoreSessions();
   }, []);

@@ -159,3 +159,18 @@ const BranchConfigSchema = new mongoose.Schema({
 
 export const BranchConfig = mongoose.model("BranchConfig", BranchConfigSchema);
 
+// ─── UploadLog (tracks uploaded Excel/CSV files) ──────────────────────────────
+const UploadLogSchema = new mongoose.Schema({
+  fileName:             { type: String, required: true },
+  fileType:             { type: String, default: "Student Placement Records Excel" },
+  fileSize:             { type: Number, default: 0 },
+  totalRows:            { type: Number, default: 0 },
+  successfullyImported: { type: Number, default: 0 },
+  updatedRecords:       { type: Number, default: 0 },
+  failedRecords:        { type: Number, default: 0 },
+  duplicateRecords:     { type: Number, default: 0 },
+  uploadedBy:           { type: String, default: "TPO Admin" },
+}, { timestamps: true });
+
+export const UploadLog = mongoose.model("UploadLog", UploadLogSchema);
+
