@@ -451,6 +451,25 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
       return res.status(400).json({ message: "The uploaded sheet is empty." });
     }
 
+    // Validate Header Schema of uploaded sheet
+    const sampleRow = rows[0] || {};
+    const normalizedKeys = Object.keys(sampleRow).map(k => k.trim().toLowerCase().replace(/[^a-zA-Z0-9]/g, ""));
+
+    const hasPrn = normalizedKeys.some(k => ["prn", "rollno", "rollnumber"].includes(k));
+    const hasName = normalizedKeys.some(k => ["firstname", "name", "studentname", "fullname", "fname"].includes(k));
+    const hasBranch = normalizedKeys.some(k => ["branch", "department", "stream"].includes(k));
+
+    const missingColumns = [];
+    if (!hasPrn) missingColumns.push("PRN");
+    if (!hasName) missingColumns.push("First Name / Name");
+    if (!hasBranch) missingColumns.push("Branch");
+
+    if (missingColumns.length > 0) {
+      return res.status(400).json({
+        message: `Invalid Excel Format Schema: Missing required column(s): ${missingColumns.join(", ")}. Please make sure your Excel/CSV file matches our format template (PRN, First Name, Branch, etc.).`
+      });
+    }
+
     let totalRows = rows.length;
     let successfullyImported = 0; // brand new student records created
     let updatedRecords = 0;       // existing student records updated
@@ -743,6 +762,13 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
       }
     } catch (bcErr) {
       console.error("Error auto-syncing branch configs after Excel import:", bcErr);
+    }
+
+    // If no valid student records were created or updated (e.g. random non-placement excel uploaded)
+    if (successfullyImported === 0 && updatedRecords === 0) {
+      return res.status(400).json({
+        message: `Invalid Excel Data Schema: 0 valid student records could be processed from this file (${failedRecords} row(s) failed validation). Please check that your sheet columns match the required TPO format template (PRN, First Name, Last Name, Branch, Gender, etc.).`
+      });
     }
 
     // Save upload log to database

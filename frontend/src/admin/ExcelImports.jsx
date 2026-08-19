@@ -3,13 +3,14 @@ import axios from "axios";
 import { useAppContext } from "../appContext";
 import {
   Upload, FileSpreadsheet, Trash2, CheckCircle,
-  Award, Download, X, Plus, Save, Layers
+  Award, Download, X, Plus, Save, Layers, ShieldAlert
 } from "lucide-react";
 
 export default function ExcelImports() {
   const { API_URL, showToast } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [schemaError, setSchemaError] = useState(null);
 
   // Excel Upload Refs
   const placementFileRef = useRef(null);
@@ -120,30 +121,87 @@ export default function ExcelImports() {
     URL.revokeObjectURL(url);
   };
 
-  const handleFinalizeSubmission = async () => {
-    if (!selectedExcelFile) {
-      showToast("Please select an Excel file to upload.", "error");
+  const validateFileSchema = (file) => {
+    return new Promise((resolve) => {
+      if (!file.name.endsWith('.csv')) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result || "";
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+        if (lines.length === 0) {
+          resolve("The selected CSV file is completely empty.");
+          return;
+        }
+        const headerLine = lines[0].toLowerCase().replace(/[^a-z0-9,]/g, "");
+        const hasPrn = headerLine.includes("prn") || headerLine.includes("roll");
+        const hasBranch = headerLine.includes("branch") || headerLine.includes("department");
+        const hasName = headerLine.includes("name");
+
+        if (!hasPrn || !hasBranch || !hasName) {
+          const missing = [];
+          if (!hasPrn) missing.push("PRN / Roll No");
+          if (!hasName) missing.push("First Name / Name");
+          if (!hasBranch) missing.push("Branch");
+          resolve(`Invalid CSV Format Schema: Missing required column(s): ${missing.join(", ")}. Please download and use our CSV template.`);
+          return;
+        }
+        resolve(null);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file.slice(0, 4096));
+    });
+  };
+
+  const handleFileSelection = async (file) => {
+    if (!file) return;
+    setSchemaError(null);
+    const err = await validateFileSchema(file);
+    if (err) {
+      setSchemaError(err);
+      setSelectedExcelFile(null);
+      showToast(err, "error");
+      return;
+    }
+    setSelectedExcelFile(file);
+  };
+
+  // Submit and Ingest Excel File
+  const uploadAndIngestFile = async (file) => {
+    if (!file) {
+      showToast("Please select an Excel file to submit.", "error");
       return;
     }
     setLoading(true);
+    setSchemaError(null);
     try {
       const formData = new FormData();
-      formData.append("file", selectedExcelFile);
-      const uploadedName = selectedExcelFile.name;
+      formData.append("file", file);
+      const uploadedName = file.name;
+
       const response = await axios.post(
         `${API_URL}/admin/import-placement-excel`,
         formData,
-        { withCredentials: true, headers: { "Content-Type": "multipart/form-data" } }
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" }
+        }
       );
+
       setImportResult(response.data);
       setPlacementFileName(uploadedName);
       setSelectedExcelFile(null);
       if (placementFileRef.current) placementFileRef.current.value = "";
-      loadUploadLogs();
-      showToast("Excel file imported successfully!", "success");
+
+      await loadUploadLogs();
+      showToast(`Excel file "${uploadedName}" imported & database updated successfully!`, "success");
     } catch (err) {
       console.error("Submission error:", err);
-      showToast(err.response?.data?.message || "Failed to import Excel file.", "error");
+      const msg = err.response?.data?.message || "Failed to import Excel file. Schema mismatch or invalid format.";
+      setSchemaError(msg);
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -153,6 +211,8 @@ export default function ExcelImports() {
     loadBranchConfigs();
     loadUploadLogs();
   }, [loadBranchConfigs, loadUploadLogs]);
+
+  const activeFileName = latestUpload?.fileName || placementFileName;
 
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", gap: 30 }}>
@@ -165,90 +225,75 @@ export default function ExcelImports() {
 
       {/* Detailed Placement Records Import */}
       <div style={{ border: "1px solid var(--border-color)", padding: 24, borderRadius: "var(--radius-md)", background: "rgba(255,255,255,0.01)" }}>
-        <h3 style={{ fontSize: 16, marginBottom: 12, display: "flex", alignItems: "center", justifyItems: "center", gap: 8 }}>
-          <Award size={16} style={{ color: "var(--primary)" }} /> Bulk Import Detailed Student Placement Records
+        <h3 style={{ fontSize: 16, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <Award size={18} style={{ color: "var(--primary)" }} /> Bulk Import Detailed Student Placement Records
         </h3>
 
-        {/* Active Uploaded Excel File Banner */}
-        {latestUpload && (
+        {/* Schema / Format Validation Error Banner */}
+        {schemaError && (
           <div style={{
-            border: "1px solid rgba(99, 102, 241, 0.4)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
             borderRadius: "var(--radius-md)",
-            padding: 18,
-            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(79, 70, 229, 0.06) 100%)",
-            marginBottom: 18
+            padding: 16,
+            background: "rgba(239, 68, 68, 0.08)",
+            marginBottom: 16,
+            color: "var(--danger)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
           }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0, boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }}>
-                  <FileSpreadsheet size={24} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Active Ingested Excel Sheet
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginTop: 2, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <span>{latestUpload.fileName}</span>
-                    <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 12, background: "rgba(16, 185, 129, 0.18)", color: "var(--success)", fontWeight: 700, border: "1px solid rgba(16, 185, 129, 0.3)" }}>
-                      Live in Database
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
-                    Uploaded on {new Date(latestUpload.createdAt).toLocaleString()} &bull; {latestUpload.totalRows} total rows ({latestUpload.successfullyImported} new, {latestUpload.updatedRecords} updated)
-                  </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <ShieldAlert size={22} style={{ color: "var(--danger)", flexShrink: 0 }} />
+              <div>
+                <strong style={{ fontSize: 14 }}>Invalid Excel Schema / Format Error</strong>
+                <div style={{ fontSize: 13, marginTop: 2, color: "var(--text-primary)" }}>
+                  {schemaError}
                 </div>
               </div>
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  if (placementFileRef.current) placementFileRef.current.value = "";
-                  placementFileRef.current?.click();
-                }}
-                style={{ padding: "8px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontWeight: 600, background: "rgba(99, 102, 241, 0.15)", border: "1px solid rgba(99, 102, 241, 0.3)", color: "var(--primary)" }}
-              >
-                <Upload size={15} /> Replace / Upload New Sheet
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setSchemaError(null)}
+              style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
+            >
+              <X size={18} />
+            </button>
           </div>
         )}
 
-        {/* Excel File Dropzone / Selected File Preview */}
+        {/* Stage 1: Selected File Preview & Submit Action Card */}
         {selectedExcelFile ? (
-          <div
-            className="excel-dropzone"
-            style={{ borderStyle: "solid", borderColor: "var(--primary)", background: "rgba(99, 102, 241, 0.08)", display: "flex", flexDirection: "column", gap: 16, marginBottom: 14, padding: 20 }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, width: "100%" }}>
+          <div style={{ border: "2px solid var(--primary)", borderRadius: "var(--radius-md)", padding: 20, background: "rgba(99, 102, 241, 0.08)", marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(16, 185, 129, 0.18)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <FileSpreadsheet size={24} />
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(16, 185, 129, 0.18)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <FileSpreadsheet size={26} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    File Ready For Upload &amp; Update
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    Selected Sheet (Ready to Submit)
                   </div>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)", marginTop: 2 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", marginTop: 2 }}>
                     {selectedExcelFile.name}
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
-                    File Size: {(selectedExcelFile.size / 1024).toFixed(1)} KB &bull; Type: {selectedExcelFile.type || "Excel / CSV Document"}
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
+                    Size: {(selectedExcelFile.size / 1024).toFixed(1)} KB &bull; Type: {selectedExcelFile.name.split('.').pop().toUpperCase()} document
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={handleFinalizeSubmission}
+                  onClick={() => uploadAndIngestFile(selectedExcelFile)}
                   disabled={loading}
-                  style={{ height: 38, padding: "0 18px", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}
+                  style={{ height: 40, padding: "0 22px", fontSize: 14, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", boxShadow: "0 4px 12px rgba(16,185,129,0.3)" }}
                 >
-                  <CheckCircle size={16} />
-                  {loading ? "Importing Data..." : "Upload & Update Database Now"}
+                  <CheckCircle size={18} />
+                  {loading ? "Submitting & Parsing..." : "Submit & Process Excel Sheet"}
                 </button>
+
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -256,20 +301,19 @@ export default function ExcelImports() {
                     if (placementFileRef.current) placementFileRef.current.value = "";
                     placementFileRef.current?.click();
                   }}
-                  style={{ height: 38, padding: "0 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}
+                  style={{ height: 40, padding: "0 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}
                 >
                   <Upload size={14} /> Change File
                 </button>
+
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     setSelectedExcelFile(null);
-                    setPlacementFileName("");
+                    setSchemaError(null);
                     if (placementFileRef.current) placementFileRef.current.value = "";
                   }}
                   style={{ background: "rgba(239, 68, 68, 0.12)", border: "none", color: "var(--danger)", padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}
-                  title="Clear selected file"
                 >
                   <X size={16} /> Cancel
                 </button>
@@ -277,45 +321,107 @@ export default function ExcelImports() {
             </div>
           </div>
         ) : (
+          /* Main Excel Dropzone Box */
           <div
             className="excel-dropzone"
             onClick={() => {
               if (placementFileRef.current) placementFileRef.current.value = "";
               placementFileRef.current?.click();
             }}
-            style={{ marginBottom: 14, cursor: "pointer", padding: 24, textAlign: "center", border: "2px dashed var(--primary)", borderRadius: "var(--radius-md)", background: "rgba(99, 102, 241, 0.03)", transition: "all 0.2s" }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const file = e.dataTransfer.files[0];
+              if (file) handleFileSelection(file);
+            }}
+            style={{
+              marginBottom: 16,
+              cursor: loading ? "wait" : "pointer",
+              padding: "32px 24px",
+              textAlign: "center",
+              border: activeFileName ? "2px solid var(--primary)" : "2px dashed var(--primary)",
+              borderRadius: "var(--radius-md)",
+              background: activeFileName ? "rgba(99, 102, 241, 0.08)" : "rgba(99, 102, 241, 0.03)",
+              transition: "all 0.2s ease"
+            }}
           >
-            <Upload className="excel-dropzone-icon" size={36} style={{ color: "var(--primary)", marginBottom: 8 }} />
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
-                Drag &amp; Drop or Click to Select / Update Placement Excel Sheet
-              </div>
-              {(latestUpload?.fileName || placementFileName) && (
-                <div style={{ display: "inline-block", marginTop: 8, padding: "4px 12px", borderRadius: 12, background: "rgba(99, 102, 241, 0.1)", border: "1px solid rgba(99, 102, 241, 0.2)", fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
-                  Active File: {latestUpload?.fileName || placementFileName}
+            {loading ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Upload className="animate-spin" size={24} />
                 </div>
-              )}
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
-                Supports .xlsx, .xls, and .csv format. Required columns match the CSV template.
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: "var(--primary)" }}>
+                    Uploading &amp; Ingesting Excel File...
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>
+                    Parsing rows and updating database records...
+                  </div>
+                </div>
               </div>
-            </div>
-            <input
-              type="file"
-              ref={placementFileRef}
-              style={{ display: "none" }}
-              accept=".xlsx, .xls, .csv"
-              onClick={(e) => { e.target.value = null; }}
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                setSelectedExcelFile(file);
-                setPlacementFileName(file.name);
-                showToast(`Selected file: "${file.name}". Click "Upload & Update Database Now" to proceed.`, "info");
-              }}
-              disabled={loading}
-            />
+            ) : activeFileName ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(99,102,241,0.3)" }}>
+                  <FileSpreadsheet size={30} />
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Active Uploaded Excel Sheet
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)", marginTop: 4, letterSpacing: "-0.01em" }}>
+                    {activeFileName}
+                  </div>
+                  {latestUpload && (
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>
+                      Uploaded on {new Date(latestUpload.createdAt).toLocaleString()} &bull; {latestUpload.totalRows} total rows ({latestUpload.successfullyImported} new, {latestUpload.updatedRecords} updated)
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: 12, marginTop: 6, flexWrap: "wrap", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (placementFileRef.current) placementFileRef.current.value = "";
+                      placementFileRef.current?.click();
+                    }}
+                    style={{ height: 40, padding: "0 22px", fontSize: 13, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", boxShadow: "0 4px 12px rgba(99,102,241,0.25)" }}
+                  >
+                    <Upload size={16} /> Click to Select / Replace Sheet
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                <Upload className="excel-dropzone-icon" size={40} style={{ color: "var(--primary)" }} />
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
+                    Drag &amp; Drop or Click to Select / Update Placement Excel Sheet
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
+                    Supports .xlsx, .xls, and .csv format matching required template headers.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
+
+        <input
+          type="file"
+          ref={placementFileRef}
+          style={{ display: "none" }}
+          accept=".xlsx, .xls, .csv"
+          onClick={(e) => { e.target.value = null; }}
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) handleFileSelection(file);
+          }}
+          disabled={loading}
+        />
 
         <button
           type="button"
@@ -483,98 +589,9 @@ export default function ExcelImports() {
             </div>
           </div>
 
-          {/* 3. Submit & Verify Button */}
-          <div style={{ textAlign: "right" }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ height: 44, fontSize: 14, padding: "0 24px", display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", fontWeight: 600, boxShadow: "0 4px 12px rgba(99,102,241,0.25)" }}
-              onClick={handleFinalizeSubmission}
-              disabled={loading || !selectedExcelFile}
-            >
-              <CheckCircle size={18} />
-              {loading ? "Importing..." : "Verify & Submit Data for Placement Analysis"}
-            </button>
-          </div>
 
-          {/* 4. Uploaded Excel Files History Log Table */}
-          {uploadLogs.length > 0 && (
-            <div style={{ border: "1px solid var(--border-color)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--bg-secondary)", marginTop: 10 }}>
-              <div style={{ padding: "14px 20px", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <FileSpreadsheet size={16} style={{ color: "var(--primary)" }} />
-                  <div>
-                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Uploaded Excel Files History Log</h3>
-                    <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "2px 0 0" }}>
-                      Record of all Excel and CSV files uploaded and processed by the admin.
-                    </p>
-                  </div>
-                </div>
-                <span style={{ fontSize: 12, padding: "2px 10px", borderRadius: 10, background: "rgba(99,102,241,0.15)", color: "var(--accent)", fontWeight: 600 }}>
-                  {uploadLogs.length} File{uploadLogs.length > 1 ? "s" : ""} Ingested
-                </span>
-              </div>
 
-              <div style={{ padding: "0 20px", overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", margin: "10px 0" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                      <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>File Name</th>
-                      <th style={{ textAlign: "left", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Uploaded On</th>
-                      <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Total Rows</th>
-                      <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>New Records</th>
-                      <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Updated Records</th>
-                      <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Status</th>
-                      <th style={{ textAlign: "right", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {uploadLogs.map(log => (
-                      <tr key={log._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td style={{ padding: "10px 0", fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <FileSpreadsheet size={15} style={{ color: "var(--success)" }} />
-                            {log.fileName}
-                          </div>
-                        </td>
-                        <td style={{ padding: "10px 0", fontSize: 12, color: "var(--text-secondary)" }}>
-                          {new Date(log.createdAt).toLocaleString()}
-                        </td>
-                        <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600 }}>
-                          {log.totalRows}
-                        </td>
-                        <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--success)" }}>
-                          {log.successfullyImported}
-                        </td>
-                        <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--accent)" }}>
-                          {log.updatedRecords}
-                        </td>
-                        <td style={{ padding: "10px 0", textAlign: "center" }}>
-                          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 600 }}>
-                            Ingested
-                          </span>
-                        </td>
-                        <td style={{ padding: "10px 0", textAlign: "right" }}>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => {
-                              if (placementFileRef.current) placementFileRef.current.value = "";
-                              placementFileRef.current?.click();
-                            }}
-                            style={{ padding: "4px 10px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
-                            title="Upload new file version or updated sheet"
-                          >
-                            <Upload size={11} /> Re-upload / Update
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
     </div>
