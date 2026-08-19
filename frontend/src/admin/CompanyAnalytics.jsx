@@ -2,7 +2,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useAppContext } from "../appContext";
 import {
-  Award, FileSpreadsheet, User, Check, Search
+  Award, FileSpreadsheet, User, Check, Search,
+  Building2, Briefcase, TrendingUp, Filter,
+  ArrowUpDown, SlidersHorizontal, ArrowUpRight,
+  Users, ChevronRight, X, RotateCcw, LayoutGrid, Table as TableIcon
 } from "lucide-react";
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
@@ -24,9 +27,13 @@ export default function CompanyAnalytics() {
   const [selectedPackageRange, setSelectedPackageRange] = useState("");
   const [selectedHasPpo, setSelectedHasPpo] = useState("");
   const [selectedHasInternship, setSelectedHasInternship] = useState("");
+  const [quickFilter, setQuickFilter] = useState("all"); // 'all', 'topRecruiters', 'highPackage', 'ppos'
 
   const [sortField, setSortField] = useState("totalStudents");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Mobile View Mode Toggle ('table' or 'grid')
+  const [viewMode, setViewMode] = useState("auto"); // 'auto', 'table', 'grid'
 
   const [detailStudentPage, setDetailStudentPage] = useState(1);
   const detailItemsPerPage = 5;
@@ -137,6 +144,12 @@ export default function CompanyAnalytics() {
     }
   };
 
+  // Summary Metrics Across All Companies
+  const totalCompaniesCount = companyStatsList.length;
+  const totalPlacementsCount = companyStatsList.reduce((acc, c) => acc + c.totalStudents, 0);
+  const highestPackageEver = companyStatsList.reduce((max, c) => (c.highestPackage && c.highestPackage > max ? c.highestPackage : max), 0);
+  const totalPposCount = companyStatsList.reduce((acc, c) => acc + c.ppoCount, 0);
+
   const filteredCompanies = companyStatsList.filter(c => {
     if (search.trim()) {
       if (!c.companyName.toLowerCase().includes(search.toLowerCase())) return false;
@@ -156,6 +169,12 @@ export default function CompanyAnalytics() {
       if (selectedHasInternship === "Yes" && c.internshipCount <= 0) return false;
       if (selectedHasInternship === "No" && c.internshipCount > 0) return false;
     }
+
+    // Quick Filter Badges
+    if (quickFilter === "topRecruiters" && c.totalStudents < 3) return false;
+    if (quickFilter === "highPackage" && (c.highestPackage || 0) < 10) return false;
+    if (quickFilter === "ppos" && c.ppoCount <= 0) return false;
+
     return true;
   });
 
@@ -179,6 +198,7 @@ export default function CompanyAnalytics() {
     setSelectedPackageRange("");
     setSelectedHasPpo("");
     setSelectedHasInternship("");
+    setQuickFilter("all");
     setSortField("totalStudents");
     setSortOrder("desc");
   };
@@ -187,6 +207,7 @@ export default function CompanyAnalytics() {
     return <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 60 }}>Loading company analytics...</div>;
   }
 
+  // --- RENDER SELECTED COMPANY DETAILED ANALYTICS PAGE ---
   if (selectedCompany) {
     const comp = selectedCompany;
     const raw = comp.raw;
@@ -230,41 +251,48 @@ export default function CompanyAnalytics() {
     );
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 30 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <div>
           <button
             onClick={() => { setSelectedCompany(null); setDetailStudentPage(1); }}
             className="btn btn-secondary"
-            style={{ padding: "6px 12px", fontSize: 12, marginBottom: 12 }}
+            style={{ padding: "6px 14px", fontSize: 13, marginBottom: 14, display: "inline-flex", alignItems: "center", gap: 6 }}
           >
             ← Back to Companies List
           </button>
-          <h2 style={{ fontSize: 24, fontWeight: 700, color: "var(--primary)" }}>{comp.companyName} Analytics</h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4 }}>
-            Detailed placement performance, package breakdowns, and student lists for {comp.companyName}.
-          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--primary-glow)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Building2 size={24} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: "var(--primary)", margin: 0 }}>{comp.companyName} Analytics</h2>
+              <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 2 }}>
+                Detailed placement performance, package breakdowns, and student lists for {comp.companyName}.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, margin: 0 }}>
+        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, margin: 0 }}>
           {[
-            { icon: <User size={20} />, val: comp.totalStudents, label: "Students Placed", color: "var(--primary)", bg: "var(--primary-glow)" },
-            { icon: <Award size={20} />, val: formatLPA(comp.averagePackage), label: "Average Package", color: "var(--success)", bg: "rgba(16, 185, 129, 0.08)" },
-            { icon: <Award size={20} />, val: formatLPA(comp.medianPackage), label: "Median Package", color: "var(--accent)", bg: "var(--accent-glow)" },
-            { icon: <Award size={20} />, val: formatLPA(comp.highestPackage), label: "Highest Package", color: "var(--secondary)", bg: "rgba(138, 63, 252, 0.08)" },
-            { icon: <Award size={20} />, val: formatLPA(comp.lowestPackage), label: "Lowest Package", color: "var(--primary)", bg: "var(--primary-glow)" },
-            { icon: <FileSpreadsheet size={20} />, val: comp.internshipCount, label: "Internships", color: "var(--success)", bg: "rgba(16, 185, 129, 0.08)" },
-            { icon: <Check size={20} />, val: comp.ppoCount, label: "PPOs Awarded", color: "var(--accent)", bg: "var(--accent-glow)" },
+            { icon: <User size={18} />, val: comp.totalStudents, label: "Students Placed", color: "var(--primary)", bg: "var(--primary-glow)" },
+            { icon: <Award size={18} />, val: formatLPA(comp.averagePackage), label: "Average Package", color: "var(--success)", bg: "rgba(16, 185, 129, 0.1)" },
+            { icon: <Award size={18} />, val: formatLPA(comp.medianPackage), label: "Median Package", color: "var(--accent)", bg: "var(--accent-glow)" },
+            { icon: <Award size={18} />, val: formatLPA(comp.highestPackage), label: "Highest Package", color: "var(--secondary)", bg: "rgba(138, 63, 252, 0.1)" },
+            { icon: <Award size={18} />, val: formatLPA(comp.lowestPackage), label: "Lowest Package", color: "var(--primary)", bg: "var(--primary-glow)" },
+            { icon: <FileSpreadsheet size={18} />, val: comp.internshipCount, label: "Internships", color: "var(--success)", bg: "rgba(16, 185, 129, 0.1)" },
+            { icon: <Check size={18} />, val: comp.ppoCount, label: "PPOs Awarded", color: "var(--accent)", bg: "var(--accent-glow)" },
           ].map((item, idx) => (
-            <div key={idx} className="wce-stat-card">
+            <div key={idx} className="wce-stat-card" style={{ padding: 14 }}>
               <div className="wce-stat-icon-wrapper" style={{ color: item.color, background: item.bg }}>{item.icon}</div>
-              <div className="wce-stat-info"><h3>{item.val}</h3><p>{item.label}</p></div>
+              <div className="wce-stat-info"><h3 style={{ fontSize: 18 }}>{item.val}</h3><p style={{ fontSize: 11 }}>{item.label}</p></div>
             </div>
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 30 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
           <div className="card" style={{ height: 320, display: "flex", flexDirection: "column" }}>
-            <h3 style={{ fontSize: 15, marginBottom: 16, borderBottom: "1px solid var(--border-color)", paddingBottom: 10 }}>Package Distribution</h3>
+            <h3 style={{ fontSize: 15, marginBottom: 14, borderBottom: "1px solid var(--border-color)", paddingBottom: 8 }}>Package Distribution</h3>
             <div style={{ flex: 1, position: "relative" }}>
               {raw.packages.length > 0 ? (
                 <Doughnut data={distData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "right", labels: { color: "#475569", font: { family: "Inter", size: 11 } } } } }} />
@@ -275,7 +303,7 @@ export default function CompanyAnalytics() {
           </div>
 
           <div className="card" style={{ height: 320, display: "flex", flexDirection: "column" }}>
-            <h3 style={{ fontSize: 15, marginBottom: 16, borderBottom: "1px solid var(--border-color)", paddingBottom: 10 }}>Branch Recruitment Breakdown</h3>
+            <h3 style={{ fontSize: 15, marginBottom: 14, borderBottom: "1px solid var(--border-color)", paddingBottom: 8 }}>Branch Recruitment Breakdown</h3>
             <div style={{ flex: 1, position: "relative" }}>
               {branchLabels.length > 0 ? (
                 <Bar data={branchData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: "#64748b" } }, y: { grid: { color: "rgba(47, 49, 146, 0.05)" }, ticks: { color: "#64748b" } } } }} />
@@ -286,9 +314,9 @@ export default function CompanyAnalytics() {
           </div>
         </div>
 
-        <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
+        <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
           <div>
-            <h4 style={{ fontSize: 14, color: "var(--primary)", borderBottom: "1px solid var(--border-color)", paddingBottom: 6, marginBottom: 12 }}>Internship Statistics</h4>
+            <h4 style={{ fontSize: 14, color: "var(--primary)", borderBottom: "1px solid var(--border-color)", paddingBottom: 6, marginBottom: 10 }}>Internship Statistics</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
               <div>Total Internships Offered: <strong>{comp.internshipCount}</strong></div>
               <div>PPO Conversion: <strong>{comp.ppoCount}</strong></div>
@@ -296,7 +324,7 @@ export default function CompanyAnalytics() {
             </div>
           </div>
           <div>
-            <h4 style={{ fontSize: 14, color: "var(--primary)", borderBottom: "1px solid var(--border-color)", paddingBottom: 6, marginBottom: 12 }}>Offer Types Breakdown</h4>
+            <h4 style={{ fontSize: 14, color: "var(--primary)", borderBottom: "1px solid var(--border-color)", paddingBottom: 6, marginBottom: 10 }}>Offer Types Breakdown</h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
               <div>Primary (PRIMARY) Offers: <strong>{comp.primaryOffers}</strong></div>
               <div>Secondary (SECONDARY) Offers: <strong>{comp.secondaryOffers}</strong></div>
@@ -306,13 +334,13 @@ export default function CompanyAnalytics() {
         </div>
 
         <div className="card" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <h3 style={{ fontSize: 18, borderBottom: "1px solid var(--border-color)", paddingBottom: 12, margin: 0 }}>Student Placements &amp; Interns</h3>
+          <h3 style={{ fontSize: 17, borderBottom: "1px solid var(--border-color)", paddingBottom: 10, margin: 0 }}>Student Placements &amp; Interns</h3>
           {paginatedDetailStudents.length === 0 ? (
             <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 20 }}>No students found.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div className="table-container">
-                <table className="data-table">
+              <div className="table-container" style={{ overflowX: "auto" }}>
+                <table className="data-table" style={{ width: "100%", minWidth: 600 }}>
                   <thead>
                     <tr>
                       <th>Student Name</th><th>PRN</th><th>Branch</th><th>Gender</th><th>Placement Offers</th><th>Internship Details</th>
@@ -363,134 +391,424 @@ export default function CompanyAnalytics() {
   }
 
   return (
-    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-color)", paddingBottom: 12 }}>
-        <h2 style={{ fontSize: 20 }}>Companies Placement Analytics</h2>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Unique Recruiting Companies: <strong>{total}</strong></span>
-      </div>
-
-      {/* Filter and Search controls bar */}
-      <div className="filter-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, margin: 0, padding: 0, border: "none", background: "none" }}>
-        <div className="form-group">
-          <label>Search Company</label>
-          <div style={{ position: "relative" }}>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search company name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: 32, height: 38 }}
-            />
-            <Search size={12} style={{ position: "absolute", left: 10, top: 13, color: "var(--text-muted)" }} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Header Banner */}
+      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: 10 }}>
+              <Building2 size={24} style={{ color: "var(--primary)" }} /> Companies Placement Analytics
+            </h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 4, margin: "4px 0 0" }}>
+              Comprehensive performance breakdown, average salaries, and recruiting statistics for all companies.
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, background: "rgba(99,102,241,0.12)", color: "var(--primary)", fontWeight: 700, border: "1px solid rgba(99,102,241,0.2)" }}>
+              {total} Recruiting Companies
+            </span>
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Avg Package Range</label>
-          <select className="form-control" value={selectedPackageRange} onChange={(e) => setSelectedPackageRange(e.target.value)} style={{ height: 38 }}>
-            <option value="">All Avg Packages</option>
-            <option value="< 5">&lt; 5 LPA</option>
-            <option value="5-10">5 - 10 LPA</option>
-            <option value="10-15">10 - 15 LPA</option>
-            <option value="> 15">&gt; 15 LPA</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>PPO Offered</label>
-          <select className="form-control" value={selectedHasPpo} onChange={(e) => setSelectedHasPpo(e.target.value)} style={{ height: 38 }}>
-            <option value="">All</option>
-            <option value="Yes">Has PPO Offers</option>
-            <option value="No">No PPO Offers</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Internship Offered</label>
-          <select className="form-control" value={selectedHasInternship} onChange={(e) => setSelectedHasInternship(e.target.value)} style={{ height: 38 }}>
-            <option value="">All</option>
-            <option value="Yes">Has Internships</option>
-            <option value="No">No Internships</option>
-          </select>
+        {/* Overview KPI Cards */}
+        <div className="wce-stats-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 4 }}>
+          <div className="wce-stat-card" style={{ padding: 14 }}>
+            <div className="wce-stat-icon-wrapper" style={{ color: "var(--primary)", background: "var(--primary-glow)" }}>
+              <Building2 size={18} />
+            </div>
+            <div className="wce-stat-info">
+              <h3 style={{ fontSize: 18 }}>{totalCompaniesCount}</h3>
+              <p style={{ fontSize: 11 }}>Total Companies</p>
+            </div>
+          </div>
+          <div className="wce-stat-card" style={{ padding: 14 }}>
+            <div className="wce-stat-icon-wrapper" style={{ color: "var(--success)", background: "rgba(16, 185, 129, 0.1)" }}>
+              <Users size={18} />
+            </div>
+            <div className="wce-stat-info">
+              <h3 style={{ fontSize: 18 }}>{totalPlacementsCount}</h3>
+              <p style={{ fontSize: 11 }}>Total Placed Students</p>
+            </div>
+          </div>
+          <div className="wce-stat-card" style={{ padding: 14 }}>
+            <div className="wce-stat-icon-wrapper" style={{ color: "var(--secondary)", background: "rgba(138, 63, 252, 0.1)" }}>
+              <Award size={18} />
+            </div>
+            <div className="wce-stat-info">
+              <h3 style={{ fontSize: 18 }}>{formatLPA(highestPackageEver)}</h3>
+              <p style={{ fontSize: 11 }}>Highest Package Offer</p>
+            </div>
+          </div>
+          <div className="wce-stat-card" style={{ padding: 14 }}>
+            <div className="wce-stat-icon-wrapper" style={{ color: "var(--accent)", background: "var(--accent-glow)" }}>
+              <Check size={18} />
+            </div>
+            <div className="wce-stat-info">
+              <h3 style={{ fontSize: 18 }}>{totalPposCount}</h3>
+              <p style={{ fontSize: 11 }}>PPOs Converted</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {(search || selectedPackageRange || selectedHasPpo || selectedHasInternship) && (
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button className="btn btn-secondary" onClick={handleResetFilters} style={{ padding: "6px 16px", fontSize: 12 }}>
-            Reset Filters
-          </button>
+      {/* Main Search & Filter Control Center Card */}
+      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Quick Filter Badges */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+            <Filter size={13} /> Quick Filter:
+          </span>
+          {[
+            { id: "all", label: "All Companies" },
+            { id: "topRecruiters", label: "Top Recruiters (3+ Placements)" },
+            { id: "highPackage", label: "High Package (≥10 LPA)" },
+            { id: "ppos", label: "Companies with PPOs" }
+          ].map(badge => (
+            <button
+              key={badge.id}
+              type="button"
+              onClick={() => setQuickFilter(badge.id)}
+              style={{
+                padding: "5px 12px",
+                borderRadius: 16,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                border: "none",
+                transition: "all 0.15s ease",
+                background: quickFilter === badge.id ? "var(--primary)" : "var(--bg-secondary)",
+                color: quickFilter === badge.id ? "#fff" : "var(--text-secondary)"
+              }}
+            >
+              {badge.label}
+            </button>
+          ))}
         </div>
-      )}
 
+        {/* Detailed Controls Grid */}
+        <div className="filter-bar" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, margin: 0, padding: 0, border: "none", background: "none" }}>
+          
+          {/* Search Box */}
+          <div className="form-group">
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Search Company</label>
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Type company name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: 34, height: 38, fontSize: 13 }}
+              />
+              <Search size={14} style={{ position: "absolute", left: 11, top: 12, color: "var(--text-muted)" }} />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  style={{ position: "absolute", right: 10, top: 10, background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 0 }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sort Field Selector */}
+          <div className="form-group">
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Sort Field</label>
+            <div style={{ position: "relative" }}>
+              <select
+                className="form-control"
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value)}
+                style={{ height: 38, fontSize: 13, fontWeight: 600 }}
+              >
+                <option value="totalStudents">Total Students Placed</option>
+                <option value="companyName">Company Name (A-Z)</option>
+                <option value="averagePackage">Average Package (LPA)</option>
+                <option value="highestPackage">Highest Package (LPA)</option>
+                <option value="ppoCount">PPO Offers Count</option>
+                <option value="internshipCount">Internships Count</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Sort Direction Toggle */}
+          <div className="form-group">
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Sort Order</label>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setSortOrder(order => order === "asc" ? "desc" : "asc")}
+              style={{ height: 38, width: "100%", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+            >
+              <ArrowUpDown size={14} />
+              {sortOrder === "desc" ? "High to Low (Desc)" : "Low to High (Asc)"}
+            </button>
+          </div>
+
+          {/* Package Filter */}
+          <div className="form-group">
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Avg Package Range</label>
+            <select className="form-control" value={selectedPackageRange} onChange={(e) => setSelectedPackageRange(e.target.value)} style={{ height: 38, fontSize: 13 }}>
+              <option value="">All Avg Packages</option>
+              <option value="< 5">&lt; 5 LPA</option>
+              <option value="5-10">5 - 10 LPA</option>
+              <option value="10-15">10 - 15 LPA</option>
+              <option value="> 15">&gt; 15 LPA</option>
+            </select>
+          </div>
+
+          {/* PPO Filter */}
+          <div className="form-group">
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>PPO Offered</label>
+            <select className="form-control" value={selectedHasPpo} onChange={(e) => setSelectedHasPpo(e.target.value)} style={{ height: 38, fontSize: 13 }}>
+              <option value="">All Companies</option>
+              <option value="Yes">Has PPO Offers</option>
+              <option value="No">No PPO Offers</option>
+            </select>
+          </div>
+
+          {/* Internship Filter */}
+          <div className="form-group">
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 4 }}>Internships Offered</label>
+            <select className="form-control" value={selectedHasInternship} onChange={(e) => setSelectedHasInternship(e.target.value)} style={{ height: 38, fontSize: 13 }}>
+              <option value="">All Companies</option>
+              <option value="Yes">Has Internships</option>
+              <option value="No">No Internships</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Action bar (Reset & View Toggle) */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTop: "1px solid var(--border-color)", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            Showing <strong>{sortedCompanies.length}</strong> of {companyStatsList.length} companies
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {/* View Mode Toggle Buttons */}
+            <div style={{ display: "flex", background: "var(--bg-secondary)", borderRadius: 6, padding: 2, gap: 2 }}>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                style={{
+                  border: "none",
+                  padding: "4px 10px",
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: viewMode === "table" ? "var(--primary)" : "transparent",
+                  color: viewMode === "table" ? "#fff" : "var(--text-secondary)"
+                }}
+                title="Desktop Table View"
+              >
+                <TableIcon size={13} /> Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                style={{
+                  border: "none",
+                  padding: "4px 10px",
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: viewMode === "grid" ? "var(--primary)" : "transparent",
+                  color: viewMode === "grid" ? "#fff" : "var(--text-secondary)"
+                }}
+                title="Mobile Cards Grid View"
+              >
+                <LayoutGrid size={13} /> Mobile Cards
+              </button>
+            </div>
+
+            {(search || selectedPackageRange || selectedHasPpo || selectedHasInternship || quickFilter !== "all") && (
+              <button
+                className="btn btn-secondary"
+                onClick={handleResetFilters}
+                style={{ padding: "5px 12px", fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
+              >
+                <RotateCcw size={12} /> Reset
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Companies Display Area */}
       {sortedCompanies.length === 0 ? (
-        <div style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>No recruiting companies found matching your filters.</div>
+        <div className="card" style={{ textAlign: "center", color: "var(--text-secondary)", padding: 40 }}>
+          No recruiting companies found matching your filters.
+        </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Scrollable Container with sticky headers */}
-          <div className="table-container" style={{ maxHeight: "550px", overflowY: "auto", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}>
-            <table className="data-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
-              <thead>
-                <tr>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("companyName")}>
-                    Company Name {sortField === "companyName" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("totalStudents")}>
-                    Total Students {sortField === "totalStudents" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("averagePackage")}>
-                    Average Package {sortField === "averagePackage" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("medianPackage")}>
-                    Median Package {sortField === "medianPackage" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("highestPackage")}>
-                    Highest Package {sortField === "highestPackage" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("lowestPackage")}>
-                    Lowest Package {sortField === "lowestPackage" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("internshipCount")}>
-                    Internships {sortField === "internshipCount" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("ppoCount")}>
-                    PPO Count {sortField === "ppoCount" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("primaryOffers")}>
-                    Primary {sortField === "primaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("secondaryOffers")}>
-                    Secondary {sortField === "secondaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
-                  </th>
-                  <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center" }}>
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedCompanies.map((c, idx) => (
-                  <tr key={idx}>
-                    <td style={{ fontWeight: 600 }}>{c.companyName}</td>
-                    <td style={{ textAlign: "center", fontWeight: 600 }}>{c.totalStudents}</td>
-                    <td style={{ fontWeight: 600, color: "var(--primary)" }}>{formatLPA(c.averagePackage)}</td>
-                    <td>{formatLPA(c.medianPackage)}</td>
-                    <td>{formatLPA(c.highestPackage)}</td>
-                    <td>{formatLPA(c.lowestPackage)}</td>
-                    <td style={{ textAlign: "center" }}>{c.internshipCount}</td>
-                    <td style={{ textAlign: "center", fontWeight: 600, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)" }}>{c.ppoCount}</td>
-                    <td style={{ textAlign: "center" }}>{c.primaryOffers}</td>
-                    <td style={{ textAlign: "center" }}>{c.secondaryOffers}</td>
-                    <td style={{ textAlign: "center" }}>
-                      <button onClick={() => setSelectedCompany(c)} className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 11, height: 28 }}>
-                        Analyze Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div>
+          {/* MOBILE CENTRIC CARDS GRID VIEW (Active when viewMode is 'grid' or on mobile screens) */}
+          {(viewMode === "grid" || viewMode === "auto") && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                gap: 16,
+                marginBottom: viewMode === "auto" ? 24 : 0
+              }}
+            >
+              {sortedCompanies.map((c, idx) => (
+                <div
+                  key={idx}
+                  className="card"
+                  style={{
+                    padding: 16,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: 14,
+                    border: "1px solid var(--border-color)",
+                    transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                    cursor: "pointer"
+                  }}
+                  onClick={() => setSelectedCompany(c)}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--primary-glow)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Building2 size={20} />
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+                          {c.companyName}
+                        </h3>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                          Primary: {c.primaryOffers} &bull; Sec: {c.secondaryOffers}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 12, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 700 }}>
+                      {c.totalStudents} Placed
+                    </span>
+                  </div>
+
+                  {/* Metrics Pill Grid for Mobile */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "var(--bg-secondary)", padding: 10, borderRadius: 8, fontSize: 12 }}>
+                    <div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Avg Package</div>
+                      <div style={{ fontWeight: 700, color: "var(--primary)", fontSize: 13, marginTop: 2 }}>
+                        {formatLPA(c.averagePackage)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Highest Package</div>
+                      <div style={{ fontWeight: 700, color: "var(--secondary)", fontSize: 13, marginTop: 2 }}>
+                        {formatLPA(c.highestPackage)}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>PPOs Awarded</div>
+                      <div style={{ fontWeight: 700, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)", fontSize: 13, marginTop: 2 }}>
+                        {c.ppoCount}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ color: "var(--text-muted)", fontSize: 10, textTransform: "uppercase" }}>Internships</div>
+                      <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 13, marginTop: 2 }}>
+                        {c.internshipCount}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedCompany(c);
+                    }}
+                    style={{ width: "100%", height: 34, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  >
+                    Analyze Details <ChevronRight size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* DESKTOP STICKY DATA TABLE VIEW (Active when viewMode is 'table' or 'auto') */}
+          {(viewMode === "table" || viewMode === "auto") && (
+            <div className="card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <TableIcon size={14} /> Full Metrics Spreadsheet View:
+              </div>
+              <div className="table-container" style={{ maxHeight: "520px", overflowY: "auto", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}>
+                <table className="data-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 750 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("companyName")}>
+                        Company Name {sortField === "companyName" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("totalStudents")}>
+                        Total Students {sortField === "totalStudents" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("averagePackage")}>
+                        Average Package {sortField === "averagePackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("medianPackage")}>
+                        Median Package {sortField === "medianPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("highestPackage")}>
+                        Highest Package {sortField === "highestPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", cursor: "pointer" }} onClick={() => handleSort("lowestPackage")}>
+                        Lowest Package {sortField === "lowestPackage" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("internshipCount")}>
+                        Internships {sortField === "internshipCount" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("ppoCount")}>
+                        PPO Count {sortField === "ppoCount" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("primaryOffers")}>
+                        Primary {sortField === "primaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center", cursor: "pointer" }} onClick={() => handleSort("secondaryOffers")}>
+                        Secondary {sortField === "secondaryOffers" && (sortOrder === "asc" ? "▲" : "▼")}
+                      </th>
+                      <th style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-secondary)", textAlign: "center" }}>
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedCompanies.map((c, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontWeight: 600 }}>{c.companyName}</td>
+                        <td style={{ textAlign: "center", fontWeight: 600 }}>{c.totalStudents}</td>
+                        <td style={{ fontWeight: 600, color: "var(--primary)" }}>{formatLPA(c.averagePackage)}</td>
+                        <td>{formatLPA(c.medianPackage)}</td>
+                        <td>{formatLPA(c.highestPackage)}</td>
+                        <td>{formatLPA(c.lowestPackage)}</td>
+                        <td style={{ textAlign: "center" }}>{c.internshipCount}</td>
+                        <td style={{ textAlign: "center", fontWeight: 600, color: c.ppoCount > 0 ? "var(--success)" : "var(--text-muted)" }}>{c.ppoCount}</td>
+                        <td style={{ textAlign: "center" }}>{c.primaryOffers}</td>
+                        <td style={{ textAlign: "center" }}>{c.secondaryOffers}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <button onClick={() => setSelectedCompany(c)} className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 11, height: 28 }}>
+                            Analyze Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
