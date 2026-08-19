@@ -172,32 +172,44 @@ export default function ExcelImports() {
         {/* Active Uploaded Excel File Banner */}
         {latestUpload && (
           <div style={{
-            border: "1px solid rgba(99, 102, 241, 0.3)",
+            border: "1px solid rgba(99, 102, 241, 0.4)",
             borderRadius: "var(--radius-md)",
-            padding: 16,
-            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)",
+            padding: 18,
+            background: "linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(79, 70, 229, 0.06) 100%)",
             marginBottom: 18
           }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 42, height: 42, borderRadius: 10, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
-                  <FileSpreadsheet size={22} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 46, height: 46, borderRadius: 12, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0, boxShadow: "0 4px 12px rgba(99,102,241,0.3)" }}>
+                  <FileSpreadsheet size={24} />
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    Active Uploaded Excel File
+                    Active Ingested Excel Sheet
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginTop: 2, display: "flex", alignItems: "center", gap: 10 }}>
-                    {latestUpload.fileName}
-                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 600 }}>
-                      Ingested &amp; Live
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginTop: 2, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span>{latestUpload.fileName}</span>
+                    <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 12, background: "rgba(16, 185, 129, 0.18)", color: "var(--success)", fontWeight: 700, border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+                      Live in Database
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
                     Uploaded on {new Date(latestUpload.createdAt).toLocaleString()} &bull; {latestUpload.totalRows} total rows ({latestUpload.successfullyImported} new, {latestUpload.updatedRecords} updated)
                   </div>
                 </div>
               </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  if (placementFileRef.current) placementFileRef.current.value = "";
+                  placementFileRef.current?.click();
+                }}
+                style={{ padding: "8px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontWeight: 600, background: "rgba(99, 102, 241, 0.15)", border: "1px solid rgba(99, 102, 241, 0.3)", color: "var(--primary)" }}
+              >
+                <Upload size={15} /> Replace / Upload New Sheet
+              </button>
             </div>
           </div>
         )}
@@ -206,48 +218,85 @@ export default function ExcelImports() {
         {selectedExcelFile ? (
           <div
             className="excel-dropzone"
-            style={{ borderStyle: "solid", borderColor: "var(--primary)", background: "rgba(99, 102, 241, 0.06)", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}
+            style={{ borderStyle: "solid", borderColor: "var(--primary)", background: "rgba(99, 102, 241, 0.08)", display: "flex", flexDirection: "column", gap: 16, marginBottom: 14, padding: 20 }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 8, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <FileSpreadsheet size={20} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, width: "100%" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(16, 185, 129, 0.18)", color: "var(--success)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <FileSpreadsheet size={24} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--success)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    File Ready For Upload &amp; Update
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)", marginTop: 2 }}>
+                    {selectedExcelFile.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
+                    File Size: {(selectedExcelFile.size / 1024).toFixed(1)} KB &bull; Type: {selectedExcelFile.type || "Excel / CSV Document"}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                  Selected File: {selectedExcelFile.name}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                  Size: {(selectedExcelFile.size / 1024).toFixed(1)} KB &bull; Ready to process. Review branch counts below and click 'Verify &amp; Submit'.
-                </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleFinalizeSubmission}
+                  disabled={loading}
+                  style={{ height: 38, padding: "0 18px", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}
+                >
+                  <CheckCircle size={16} />
+                  {loading ? "Importing Data..." : "Upload & Update Database Now"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (placementFileRef.current) placementFileRef.current.value = "";
+                    placementFileRef.current?.click();
+                  }}
+                  style={{ height: 38, padding: "0 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <Upload size={14} /> Change File
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedExcelFile(null);
+                    setPlacementFileName("");
+                    if (placementFileRef.current) placementFileRef.current.value = "";
+                  }}
+                  style={{ background: "rgba(239, 68, 68, 0.12)", border: "none", color: "var(--danger)", padding: "8px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}
+                  title="Clear selected file"
+                >
+                  <X size={16} /> Cancel
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedExcelFile(null);
-                setPlacementFileName("");
-                if (placementFileRef.current) placementFileRef.current.value = "";
-              }}
-              style={{ background: "rgba(239, 68, 68, 0.12)", border: "none", color: "var(--danger)", padding: 6, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-              title="Clear selected file"
-            >
-              <X size={18} />
-            </button>
           </div>
         ) : (
           <div
             className="excel-dropzone"
-            onClick={() => placementFileRef.current?.click()}
-            style={{ marginBottom: 14 }}
+            onClick={() => {
+              if (placementFileRef.current) placementFileRef.current.value = "";
+              placementFileRef.current?.click();
+            }}
+            style={{ marginBottom: 14, cursor: "pointer", padding: 24, textAlign: "center", border: "2px dashed var(--primary)", borderRadius: "var(--radius-md)", background: "rgba(99, 102, 241, 0.03)", transition: "all 0.2s" }}
           >
-            <Upload className="excel-dropzone-icon" size={32} style={{ color: "var(--primary)" }} />
+            <Upload className="excel-dropzone-icon" size={36} style={{ color: "var(--primary)", marginBottom: 8 }} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                {placementFileName ? `Active Uploaded File: ${placementFileName}` : "Drag & Drop or Click to Select Student Records Excel/CSV"}
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+                Drag &amp; Drop or Click to Select / Update Placement Excel Sheet
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
-                Required columns match the download template (PRN, Branch, Name, salaries, status).
+              {(latestUpload?.fileName || placementFileName) && (
+                <div style={{ display: "inline-block", marginTop: 8, padding: "4px 12px", borderRadius: 12, background: "rgba(99, 102, 241, 0.1)", border: "1px solid rgba(99, 102, 241, 0.2)", fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
+                  Active File: {latestUpload?.fileName || placementFileName}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+                Supports .xlsx, .xls, and .csv format. Required columns match the CSV template.
               </div>
             </div>
             <input
@@ -255,12 +304,13 @@ export default function ExcelImports() {
               ref={placementFileRef}
               style={{ display: "none" }}
               accept=".xlsx, .xls, .csv"
+              onClick={(e) => { e.target.value = null; }}
               onChange={(e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 setSelectedExcelFile(file);
                 setPlacementFileName(file.name);
-                showToast(`File "${file.name}" selected. Review branch counts below and click 'Verify & Submit'.`, "info");
+                showToast(`Selected file: "${file.name}". Click "Upload & Update Database Now" to proceed.`, "info");
               }}
               disabled={loading}
             />
@@ -474,7 +524,8 @@ export default function ExcelImports() {
                       <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Total Rows</th>
                       <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>New Records</th>
                       <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Updated Records</th>
-                      <th style={{ textAlign: "right", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ textAlign: "center", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Status</th>
+                      <th style={{ textAlign: "right", fontSize: 11, color: "var(--text-muted)", padding: "8px 0", textTransform: "uppercase" }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -498,10 +549,24 @@ export default function ExcelImports() {
                         <td style={{ padding: "10px 0", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--accent)" }}>
                           {log.updatedRecords}
                         </td>
-                        <td style={{ padding: "10px 0", textAlign: "right" }}>
+                        <td style={{ padding: "10px 0", textAlign: "center" }}>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", fontWeight: 600 }}>
                             Ingested
                           </span>
+                        </td>
+                        <td style={{ padding: "10px 0", textAlign: "right" }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => {
+                              if (placementFileRef.current) placementFileRef.current.value = "";
+                              placementFileRef.current?.click();
+                            }}
+                            style={{ padding: "4px 10px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}
+                            title="Upload new file version or updated sheet"
+                          >
+                            <Upload size={11} /> Re-upload / Update
+                          </button>
                         </td>
                       </tr>
                     ))}
