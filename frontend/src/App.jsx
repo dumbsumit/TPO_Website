@@ -7,7 +7,6 @@ import { initGoogleAuth } from "./googleAuth";
 import Home             from "./pages/Home";
 import Companies        from "./pages/Companies";
 import CompanyDetails   from "./pages/CompanyDetails";
-import Statistics       from "./pages/Statistics";
 import Experiences      from "./pages/Experiences";
 import SubmitExperience from "./pages/SubmitExperience";
 import AdminLogin       from "./pages/AdminLogin";
@@ -170,12 +169,6 @@ export default function App() {
               <ul className={`nav-links ${mobileMenuOpen ? "mobile-open" : ""}`}>
                 <li><NavLink to="/">Home</NavLink></li>
                 <li><NavLink to="/companies">Companies</NavLink></li>
-
-                {/* Statistics — admin only */}
-                {adminUser && (
-                  <li><NavLink to="/statistics">Statistics</NavLink></li>
-                )}
-
                 <li><NavLink to="/experiences">Experiences</NavLink></li>
 
                 {/* Share experience — logged-in students only */}
@@ -273,7 +266,6 @@ export default function App() {
                 <Route path="/admin-login" element={<AdminLogin onLogin={loginAdmin} />} />
                 <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/admin-profile"   element={<AdminRoute><AdminProfile /></AdminRoute>} />
-                <Route path="/statistics"      element={<AdminRoute><Statistics /></AdminRoute>} />
 
                 {/* ── Student routes ── */}
                 <Route path="/student-login"    element={<StudentLogin    onLogin={loginStudent} />} />

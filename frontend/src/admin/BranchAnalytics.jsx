@@ -67,10 +67,12 @@ export default function BranchAnalytics() {
     const b = branchMap[branchName];
     b.totalStudents++;
     
-    if (s.offers && s.offers.length > 0) {
+    // Filter ONLY PRIMARY (Company 1) offers for all branch statistics
+    const primaryOffers = s.offers?.filter(o => o.offerType === "PRIMARY" && o.companyName) || [];
+
+    if (primaryOffers.length > 0) {
       b.placedStudents++;
-      if (s.offers.length > 1) b.multipleOffers++;
-      s.offers.forEach(o => {
+      primaryOffers.forEach(o => {
         if (typeof o.packageLpa === "number") b.packages.push(o.packageLpa);
         if (o.companyName) b.companiesSet.add(o.companyName);
         const statusStr = String(o.placementStatus || "").toLowerCase();
@@ -80,7 +82,7 @@ export default function BranchAnalytics() {
     }
 
     s.internships?.forEach(i => {
-      const hasOffer = s.offers?.some(o => o.companyName === i.companyName);
+      const hasOffer = primaryOffers.some(o => o.companyName === i.companyName);
       if (!hasOffer) {
         b.internships++;
         if (String(i.ppo || "").toLowerCase() === "yes" || String(i.status || "").toLowerCase().includes("ppo")) b.ppos++;
