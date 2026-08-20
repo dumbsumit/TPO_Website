@@ -83,6 +83,7 @@ export default function App() {
     } catch { /* ignore */ }
     setAdminUser(null);
     showToast("Logged out successfully", "info");
+    window.location.hash = "/";
   };
 
   // ── Student auth ──────────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ export default function App() {
     } catch { /* ignore */ }
     setStudentUser(null);
     showToast("Logged out successfully", "info");
+    window.location.hash = "/";
   };
 
   // ── Protected Route wrappers ──────────────────────────────────────────────

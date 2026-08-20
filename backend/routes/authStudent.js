@@ -45,26 +45,37 @@ const getTransporter = () => {
   return transporter;
 };
 
-// --- Send OTP email ---
-const sendOTPEmail = async (email, name, otp) => {
+// --- Send OTP email (subject / body changes based on purpose) ---
+const sendOTPEmail = async (email, name, otp, purpose = "verify") => {
   const mail = getTransporter();
+  const isPasswordChange = purpose === "password";
   await mail.sendMail({
     from: process.env.SMTP_FROM || `"TPO WCE" <${process.env.SMTP_USER}>`,
     to: email,
-    subject: "Your TPO Portal Verification Code",
+    subject: isPasswordChange
+      ? "TPO Portal — Password Change OTP"
+      : "Your TPO Portal Verification Code",
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;background:#f8fafc;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
         <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px 32px;text-align:center;">
           <h2 style="color:#fff;margin:0;font-size:22px;">Walchand College of Engineering</h2>
-          <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">Training & Placement Office</p>
+          <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">Training &amp; Placement Office</p>
         </div>
         <div style="padding:32px;">
           <p style="color:#1e293b;font-size:16px;">Hi <strong>${name}</strong>,</p>
-          <p style="color:#475569;font-size:14px;">Use the code below to verify your email address. This code expires in <strong>10 minutes</strong>.</p>
+          <p style="color:#475569;font-size:14px;">${
+            isPasswordChange
+              ? "Use the code below to confirm your <strong>password change</strong>. This code expires in <strong>10 minutes</strong>."
+              : "Use the code below to verify your email address. This code expires in <strong>10 minutes</strong>."
+          }</p>
           <div style="background:#1e3a5f;border-radius:10px;padding:20px;text-align:center;margin:24px 0;">
             <span style="color:#fff;font-size:36px;font-weight:700;letter-spacing:12px;">${otp}</span>
           </div>
-          <p style="color:#94a3b8;font-size:12px;">If you did not request this, please ignore this email. Do not share this code with anyone.</p>
+          <p style="color:#94a3b8;font-size:12px;">${
+            isPasswordChange
+              ? "If you did not request a password change, please ignore this email and your password will remain unchanged."
+              : "If you did not request this, please ignore this email. Do not share this code with anyone."
+          }</p>
         </div>
       </div>
     `,
@@ -167,7 +178,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    await sendOTPEmail(email, name, otp);
+    await sendOTPEmail(email, name, otp, "verify");
 
     return res.status(201).json({
       message: "Registration successful. Please check your email for the OTP.",
@@ -251,7 +262,7 @@ router.post("/resend-otp", async (req, res) => {
     student.otpExpiry = otpExpiry;
     await student.save();
 
-    await sendOTPEmail(email, student.name, otp);
+    await sendOTPEmail(email, student.name, otp, "verify");
 
     return res.json({ message: "OTP sent successfully. Please check your email." });
   } catch (err) {
@@ -429,11 +440,50 @@ router.get("/me", authenticateStudent, (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────
-// PUT /api/auth/student/me  — Update profile
+// POST /api/auth/student/request-password-otp
+// Sends an OTP to the student's registered email to authorise a password change.
+// ─────────────────────────────────────────────────────
+router.post("/request-password-otp", authenticateStudent, async (req, res) => {
+  try {
+    const student = await Student.findById(req.student.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+
+    // Rate-limit: block if a fresh OTP was sent < 2 minutes ago
+    if (
+      student.otpExpiry &&
+      new Date() < new Date(student.otpExpiry.getTime() - 8 * 60 * 1000)
+    ) {
+      return res.status(429).json({
+        message: "Please wait before requesting another OTP.",
+      });
+    }
+
+    const otp       = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash   = await bcrypt.hash(otp, 10);
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    student.otpHash   = otpHash;
+    student.otpExpiry = otpExpiry;
+    await student.save();
+
+    await sendOTPEmail(student.email, student.name, otp, "password");
+
+    return res.json({
+      message: "OTP sent to your registered email address. It is valid for 10 minutes.",
+    });
+  } catch (err) {
+    console.error("Student request-password-otp error:", err);
+    return res.status(500).json({ message: "Server error sending OTP" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// PUT /api/auth/student/me  — Update profile (password change uses OTP)
 // ─────────────────────────────────────────────────────
 router.put("/me", authenticateStudent, async (req, res) => {
   try {
-    const { name, branch, graduationYear, currentPassword, newPassword } = req.body;
+    const { name, branch, graduationYear, otp, newPassword } = req.body;
     const student = await Student.findById(req.student.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
@@ -445,15 +495,29 @@ router.put("/me", authenticateStudent, async (req, res) => {
       if (newPassword.length < 8) {
         return res.status(400).json({ message: "New password must be at least 8 characters" });
       }
-      if (!student.password) {
-        return res.status(400).json({ message: "Cannot set password on a Google-only account" });
+
+      // --- OTP verification ---
+      if (!otp) {
+        return res.status(400).json({ message: "OTP is required to change your password" });
       }
-      if (!currentPassword) {
-        return res.status(400).json({ message: "Current password is required to change password" });
+      if (!student.otpHash || !student.otpExpiry) {
+        return res.status(400).json({ message: "No pending OTP found. Please request a new one." });
       }
-      const isMatch = await bcrypt.compare(currentPassword, student.password);
-      if (!isMatch) return res.status(401).json({ message: "Current password is incorrect" });
-      student.password = await bcrypt.hash(newPassword, 12);
+      if (new Date() > student.otpExpiry) {
+        student.otpHash   = null;
+        student.otpExpiry = null;
+        await student.save();
+        return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+      }
+      const otpMatch = await bcrypt.compare(otp.toString(), student.otpHash);
+      if (!otpMatch) {
+        return res.status(401).json({ message: "Invalid OTP. Please try again." });
+      }
+
+      // OTP verified — update password and clear OTP
+      student.password  = await bcrypt.hash(newPassword, 12);
+      student.otpHash   = null;
+      student.otpExpiry = null;
     }
 
     await student.save();

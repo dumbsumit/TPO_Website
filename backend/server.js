@@ -7,7 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import router from "./routes.js";
-import authAdminRouter   from "./routes/authAdmin.js";
+import authAdminRouter from "./routes/authAdmin.js";
 import authStudentRouter from "./routes/authStudent.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,13 +15,13 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-const app      = express();
-const PORT     = process.env.PORT     || 5001;
+const app = express();
+const PORT = process.env.PORT || 5001;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/tpo_db";
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────
 app.use(cors({
-  origin:      process.env.CLIENT_URL || "http://localhost:5173",
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,   // required for httpOnly cookies cross-origin
 }));
 app.use(express.json());
@@ -41,13 +41,13 @@ const checkDbConnection = (req, res, next) => {
 };
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth/admin",   checkDbConnection, authAdminRouter);
+app.use("/api/auth/admin", checkDbConnection, authAdminRouter);
 app.use("/api/auth/student", checkDbConnection, authStudentRouter);
-app.use("/api",              router);
+app.use("/api", router);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ 
+  res.json({
     message: "Placement Activity Portal Backend API is running.",
     databaseConnected: mongoose.connection.readyState === 1
   });
@@ -63,14 +63,13 @@ const connectWithRetry = () => {
   mongoose.connect(MONGO_URI)
     .then(async () => {
       console.log("Connected to MongoDB successfully.");
-      console.log("Note: Run 'node scripts/createAdmin.js' to create the TPO admin account.");
-      
+
       // Automatically clean up legacy indexes from old schemas if present
       try {
         const studentsColl = mongoose.connection.collection("students");
-        await studentsColl.dropIndex("prn_1").catch(() => {});
-        await studentsColl.dropIndex("username_1").catch(() => {});
-      } catch (_) {}
+        await studentsColl.dropIndex("prn_1").catch(() => { });
+        await studentsColl.dropIndex("username_1").catch(() => { });
+      } catch (_) { }
     })
     .catch(err => {
       console.error("MongoDB connection error:", err.message);

@@ -2,6 +2,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 import { OAuth2Client } from "google-auth-library";
 import { Admin } from "../models.js";
 import {
@@ -15,10 +16,10 @@ import {
 } from "../middleware/auth.js";
 
 const router = express.Router();
-const ALLOWED_DOMAIN = process.env.ALLOWED_DOMAIN || "walchandsangli.ac.in";
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "tpo_access_secret_key_123456789_abcdef";
+const ALLOWED_DOMAIN     = process.env.ALLOWED_DOMAIN || "walchandsangli.ac.in";
+const JWT_ACCESS_SECRET  = process.env.JWT_ACCESS_SECRET  || process.env.JWT_SECRET || "tpo_access_secret_key_123456789_abcdef";
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "tpo_refresh_secret_key_987654321_fedcba";
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "69719983983-t4s37hm9b4nnu6obf22d3urr30rbo4qk.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID   = process.env.GOOGLE_CLIENT_ID   || process.env.VITE_GOOGLE_CLIENT_ID || "69719983983-t4s37hm9b4nnu6obf22d3urr30rbo4qk.apps.googleusercontent.com";
 
 // --- Helpers ---
 const isDomainAllowed = (email) =>
@@ -28,6 +29,47 @@ const isDomainAllowed = (email) =>
 // SHA-256 hash — handles arbitrary token lengths (unlike bcrypt 72-char limit)
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
+
+// --- Nodemailer transporter (lazy init) ---
+let transporter = null;
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+  return transporter;
+};
+
+// --- Send OTP email ---
+const sendOTPEmail = async (email, name, otp) => {
+  const mail = getTransporter();
+  await mail.sendMail({
+    from: process.env.SMTP_FROM || `"TPO WCE" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: "TPO Portal — Password Change OTP",
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;background:#f8fafc;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+        <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:28px 32px;text-align:center;">
+          <h2 style="color:#fff;margin:0;font-size:22px;">Walchand College of Engineering</h2>
+          <p style="color:#bfdbfe;margin:6px 0 0;font-size:14px;">Training &amp; Placement Office</p>
+        </div>
+        <div style="padding:32px;">
+          <p style="color:#1e293b;font-size:16px;">Hi <strong>${name}</strong>,</p>
+          <p style="color:#475569;font-size:14px;">Use the code below to confirm your <strong>password change</strong>. This code expires in <strong>10 minutes</strong>.</p>
+          <div style="background:#1e3a5f;border-radius:10px;padding:20px;text-align:center;margin:24px 0;">
+            <span style="color:#fff;font-size:36px;font-weight:700;letter-spacing:12px;">${otp}</span>
+          </div>
+          <p style="color:#94a3b8;font-size:12px;">If you did not request a password change, please ignore this email and your password will remain unchanged.</p>
+        </div>
+      </div>
+    `,
+  });
+};
 
 const issueAdminTokens = async (admin, res) => {
   const accessPayload = {
@@ -221,11 +263,50 @@ router.get("/me", authenticateAdmin, (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────
-// PUT /api/auth/admin/me  — Update profile (name / password)
+// POST /api/auth/admin/request-password-otp
+// Sends an OTP to the admin's registered email to authorise a password change.
+// ─────────────────────────────────────────────────────
+router.post("/request-password-otp", authenticateAdmin, async (req, res) => {
+  try {
+    const admin = await Admin.findById(req.admin.id);
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+
+
+    // Rate-limit: block if a fresh OTP was sent < 2 minutes ago
+    if (
+      admin.otpExpiry &&
+      new Date() < new Date(admin.otpExpiry.getTime() - 8 * 60 * 1000)
+    ) {
+      return res.status(429).json({
+        message: "Please wait before requesting another OTP.",
+      });
+    }
+
+    const otp       = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash   = await bcrypt.hash(otp, 10);
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    admin.otpHash   = otpHash;
+    admin.otpExpiry = otpExpiry;
+    await admin.save();
+
+    await sendOTPEmail(admin.email, admin.name, otp);
+
+    return res.json({
+      message: "OTP sent to your registered email address. It is valid for 10 minutes.",
+    });
+  } catch (err) {
+    console.error("Admin request-password-otp error:", err);
+    return res.status(500).json({ message: "Server error sending OTP" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// PUT /api/auth/admin/me  — Update profile (name / password via OTP)
 // ─────────────────────────────────────────────────────
 router.put("/me", authenticateAdmin, async (req, res) => {
   try {
-    const { name, currentPassword, newPassword } = req.body;
+    const { name, otp, newPassword } = req.body;
     const admin = await Admin.findById(req.admin.id);
     if (!admin) return res.status(404).json({ message: "Admin not found" });
 
@@ -237,15 +318,29 @@ router.put("/me", authenticateAdmin, async (req, res) => {
       if (newPassword.length < 8) {
         return res.status(400).json({ message: "New password must be at least 8 characters" });
       }
-      if (!admin.password) {
-        return res.status(400).json({ message: "Cannot set password on a Google-only account" });
+
+      // --- OTP verification ---
+      if (!otp) {
+        return res.status(400).json({ message: "OTP is required to change your password" });
       }
-      if (!currentPassword) {
-        return res.status(400).json({ message: "Current password is required to set a new password" });
+      if (!admin.otpHash || !admin.otpExpiry) {
+        return res.status(400).json({ message: "No pending OTP found. Please request a new one." });
       }
-      const isMatch = await bcrypt.compare(currentPassword, admin.password);
-      if (!isMatch) return res.status(401).json({ message: "Current password is incorrect" });
-      admin.password = await bcrypt.hash(newPassword, 12);
+      if (new Date() > admin.otpExpiry) {
+        admin.otpHash   = null;
+        admin.otpExpiry = null;
+        await admin.save();
+        return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+      }
+      const otpMatch = await bcrypt.compare(otp.toString(), admin.otpHash);
+      if (!otpMatch) {
+        return res.status(401).json({ message: "Invalid OTP. Please try again." });
+      }
+
+      // OTP verified — update password and clear OTP
+      admin.password  = await bcrypt.hash(newPassword, 12);
+      admin.otpHash   = null;
+      admin.otpExpiry = null;
     }
 
     await admin.save();
