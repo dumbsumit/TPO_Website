@@ -64,6 +64,8 @@ const AdminSchema = new mongoose.Schema({
   googleId: { type: String, default: null },
   role: { type: String, default: "tpo_admin" },
   refreshTokenHash: { type: String, default: null },
+  otpHash:   { type: String, default: null },  // bcrypt hash of pending OTP
+  otpExpiry: { type: Date,   default: null },  // OTP expiry timestamp
 }, { timestamps: true });
 
 // ─── Student ──────────────────────────────────────────────────────────────────

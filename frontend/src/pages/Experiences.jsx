@@ -6,7 +6,7 @@ import { Search, ChevronDown, ChevronUp, BookOpen, User, Award } from "lucide-re
 import RichTextDisplay from "../components/RichTextDisplay";
 
 export default function Experiences() {
-  const { API_URL } = useAppContext();
+  const { API_URL, adminUser } = useAppContext();
   const [experiences, setExperiences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -59,9 +59,12 @@ export default function Experiences() {
             Read real interview reviews shared by graduating seniors.
           </p>
         </div>
-        <Link to="/submit-experience" className="btn btn-primary">
-          Share Your Experience
-        </Link>
+        {/* Hide for TPO admin — they manage but don't submit experiences */}
+        {!adminUser && (
+          <Link to="/submit-experience" className="btn btn-primary">
+            Share Your Experience
+          </Link>
+        )}
       </div>
 
       {/* Filters */}
