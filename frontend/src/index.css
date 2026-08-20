@@ -1318,3 +1318,43 @@ a {
 .toast.success { background: var(--success); }
 .toast.error { background: var(--danger); }
 .toast.info { background: var(--primary); }
+
+/* Rendered Rich Text Content */
+.rich-text-rendered {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.rich-text-rendered p {
+  margin-bottom: 8px;
+}
+
+.rich-text-rendered p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-rendered ul, .rich-text-rendered ol {
+  padding-left: 20px;
+  margin-bottom: 10px;
+}
+
+.rich-text-rendered li {
+  margin-bottom: 4px;
+}
+
+.rich-text-rendered h2, .rich-text-rendered h3 {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.rich-text-rendered blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 12px;
+  margin: 10px 0;
+  font-style: italic;
+  color: var(--text-muted);
+}
+

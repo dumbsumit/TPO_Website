@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import { useAppContext } from "../appContext";
 import { Search, ChevronDown, ChevronUp, BookOpen, User, Award } from "lucide-react";
+import RichTextDisplay from "../components/RichTextDisplay";
 
 export default function Experiences() {
   const { API_URL, adminUser } = useAppContext();
@@ -11,7 +12,8 @@ export default function Experiences() {
   const [expandedId, setExpandedId] = useState(null);
 
   // Search & Filter state
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState("");
+  const [seniorSearchTerm, setSeniorSearchTerm] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("");
   const [selectedYear, setSelectedYear] = useState("");
 
@@ -29,18 +31,19 @@ export default function Experiences() {
     fetchExperiences();
   }, [API_URL]);
 
-  const branches = [...new Set(experiences.map(e => e.branch))].sort();
-  const years = [...new Set(experiences.map(e => e.graduationYear))].sort((a, b) => b - a);
+  // Derive unique values for dropdowns
+  const sharedCompanies = [...new Set(experiences.map(e => e.companyName).filter(Boolean))].sort();
+  const branches = [...new Set(experiences.map(e => e.branch).filter(Boolean))].sort();
+  const years = [...new Set(experiences.map(e => e.graduationYear).filter(Boolean))].sort((a, b) => b - a);
 
   // Filter Logic
   const filtered = experiences.filter(exp => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      exp.companyName.toLowerCase().includes(term) || 
-      (exp.studentName && exp.studentName.toLowerCase().includes(term));
+    const matchesCompany = selectedCompany === "" || (exp.companyName && exp.companyName.toLowerCase() === selectedCompany.toLowerCase());
+    const term = seniorSearchTerm.toLowerCase();
+    const matchesSenior = seniorSearchTerm === "" || (exp.studentName && exp.studentName.toLowerCase().includes(term));
     const matchesBranch = selectedBranch === "" || exp.branch === selectedBranch;
     const matchesYear = selectedYear === "" || exp.graduationYear === Number(selectedYear);
-    return matchesSearch && matchesBranch && matchesYear;
+    return matchesCompany && matchesSenior && matchesBranch && matchesYear;
   });
 
   const toggleExpand = (id) => {
@@ -66,15 +69,31 @@ export default function Experiences() {
 
       {/* Filters */}
       <div className="filter-bar">
+        {/* Company Dropdown (companies whose experience has been shared) */}
         <div className="form-group">
-          <label>Search Company or Senior Name</label>
+          <label>Company</label>
+          <select
+            className="form-control"
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+          >
+            <option value="">All Companies ({sharedCompanies.length})</option>
+            {sharedCompanies.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Senior Name Search */}
+        <div className="form-group">
+          <label>Search Senior Name</label>
           <div style={{ position: "relative" }}>
             <input
               type="text"
               className="form-control"
-              placeholder="e.g. Google, Aditya"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="e.g. Afnan"
+              value={seniorSearchTerm}
+              onChange={(e) => setSeniorSearchTerm(e.target.value)}
               style={{ paddingLeft: 36, width: "100%" }}
             />
             <Search size={16} style={{ position: "absolute", left: 12, top: 12, color: "var(--text-muted)" }} />
@@ -112,7 +131,7 @@ export default function Experiences() {
         <div className="form-group" style={{ justifyContent: "flex-end" }}>
           <button 
             className="btn btn-secondary" 
-            onClick={() => { setSearchTerm(""); setSelectedBranch(""); setSelectedYear(""); }}
+            onClick={() => { setSelectedCompany(""); setSeniorSearchTerm(""); setSelectedBranch(""); setSelectedYear(""); }}
             style={{ height: 38 }}
           >
             Reset Filters
@@ -155,7 +174,7 @@ export default function Experiences() {
 
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <span className="tag" style={{ background: "rgba(99, 102, 241, 0.15)", color: "var(--primary)", fontWeight: 600, border: "none" }}>
-                      {exp.rounds.length} Rounds
+                      {exp.rounds ? exp.rounds.length : 0} Rounds
                     </span>
                     {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                   </div>
@@ -166,19 +185,21 @@ export default function Experiences() {
                   <div style={{ marginTop: 24, borderTop: "1px solid var(--border-color)", paddingTop: 24 }}>
                     
                     {/* Rounds */}
-                    <div style={{ marginBottom: 24 }}>
-                      <h4 style={{ fontSize: 16, marginBottom: 16, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
-                        <BookOpen size={16} style={{ color: "var(--primary)" }} /> Interview Workflow & Questions
-                      </h4>
-                      <div className="exp-timeline">
-                        {exp.rounds.map((round, rIdx) => (
-                          <div key={rIdx} className="exp-round">
-                            <h5 style={{ fontSize: 14, color: "var(--primary)", marginBottom: 4 }}>{round.title}</h5>
-                            <p style={{ color: "var(--text-secondary)", fontSize: 13.5, whiteSpace: "pre-line", lineHeight: 1.6 }}>{round.content}</p>
-                          </div>
-                        ))}
+                    {exp.rounds && exp.rounds.length > 0 && (
+                      <div style={{ marginBottom: 24 }}>
+                        <h4 style={{ fontSize: 16, marginBottom: 16, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 8 }}>
+                          <BookOpen size={16} style={{ color: "var(--primary)" }} /> Interview Workflow & Questions
+                        </h4>
+                        <div className="exp-timeline">
+                          {exp.rounds.map((round, rIdx) => (
+                            <div key={rIdx} className="exp-round">
+                              <h5 style={{ fontSize: 14, color: "var(--primary)", marginBottom: 4 }}>{round.title}</h5>
+                              <RichTextDisplay content={round.content} />
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Technologies Asked */}
                     {exp.technologies && exp.technologies.length > 0 && (
@@ -198,9 +219,7 @@ export default function Experiences() {
                         <h4 style={{ fontSize: 14, marginBottom: 6, color: "var(--accent)", display: "flex", alignItems: "center", gap: 6 }}>
                           <Award size={15} /> Senior's Advice:
                         </h4>
-                        <p style={{ color: "var(--text-secondary)", fontSize: 13.5, fontStyle: "italic", lineHeight: 1.6 }}>
-                          "{exp.prepTips}"
-                        </p>
+                        <RichTextDisplay content={exp.prepTips} style={{ fontStyle: "italic" }} />
                       </div>
                     )}
 
@@ -214,3 +233,4 @@ export default function Experiences() {
     </div>
   );
 }
+

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useAppContext } from "../appContext";
 import { Check, Trash2 } from "lucide-react";
+import RichTextDisplay from "../components/RichTextDisplay";
 
 export default function ExperienceReviews() {
   const { API_URL, showToast } = useAppContext();
@@ -96,7 +97,10 @@ export default function ExperienceReviews() {
                 <div style={{ marginBottom: 10 }}><strong>Rating:</strong> {exp.overallRating ? `${exp.overallRating}/5` : "Not rated"}</div>
                 <div style={{ marginBottom: 10 }}><strong>Rounds:</strong> {(exp.rounds || []).map(r => r.title).join(" -> ") || "None added"}</div>
                 <div style={{ marginBottom: 10 }}><strong>Tags:</strong> {(exp.tags || exp.technologies || []).join(", ") || "None"}</div>
-                <div><strong>Overall Experience:</strong> {exp.overallExperience || exp.prepTips || "None"}</div>
+                <div style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                  <strong>Overall Experience:</strong> 
+                  <RichTextDisplay content={exp.overallExperience || exp.prepTips || "None"} />
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: 8 }}>

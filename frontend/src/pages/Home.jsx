@@ -5,6 +5,7 @@ import { useAppContext } from "../appContext";
 import { 
   Trophy, Briefcase, Building2, CheckCircle2, ShieldCheck 
 } from "lucide-react";
+import RichTextDisplay from "../components/RichTextDisplay";
 
 const RECRUITING_PARTNERS = [
   { name: "Google", logo: "/logos/google.jpg" },
@@ -338,9 +339,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
-                  {exp.prepTips || "No extra advice was added with this response."}
-                </p>
+                <RichTextDisplay content={exp.prepTips || "No extra advice was added with this response."} style={{ marginBottom: 12 }} />
 
                 <div style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: 6 }}>
                   <span><strong>Student:</strong> {exp.studentName}</span>
