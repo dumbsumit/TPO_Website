@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { useAppContext } from "../appContext";
 import { ChevronLeft, Briefcase, Calendar, CheckSquare, Settings, Award, Users, ChevronDown, ChevronUp } from "lucide-react";
+import RichTextDisplay from "../components/RichTextDisplay";
 
 export default function CompanyDetails() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function CompanyDetails() {
   const [expandedExpId, setExpandedExpId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
 
   useEffect(() => {
     const fetchCompanyData = async () => {
@@ -135,7 +137,7 @@ export default function CompanyDetails() {
                             {exp.rounds.map((round, rIdx) => (
                               <div key={rIdx} className="exp-round">
                                 <h5 style={{ fontSize: 14, color: "var(--primary)", marginBottom: 4 }}>{round.title}</h5>
-                                <p style={{ color: "var(--text-secondary)", fontSize: 13.5, whiteSpace: "pre-line" }}>{round.content}</p>
+                                <RichTextDisplay content={round.content} />
                               </div>
                             ))}
                           </div>
@@ -156,9 +158,7 @@ export default function CompanyDetails() {
                           {exp.prepTips && (
                             <div>
                               <h4 style={{ fontSize: 14, marginBottom: 6, color: "var(--text-primary)" }}>Preparation Tips & Advice:</h4>
-                              <p style={{ color: "var(--text-secondary)", fontSize: 13.5, fontStyle: "italic", background: "rgba(255,255,255,0.02)", padding: 12, borderRadius: 6, borderLeft: "2px solid var(--accent)" }}>
-                                "{exp.prepTips}"
-                              </p>
+                              <RichTextDisplay content={exp.prepTips} style={{ fontStyle: "italic", background: "rgba(255,255,255,0.02)", padding: 12, borderRadius: 6, borderLeft: "2px solid var(--accent)" }} />
                             </div>
                           )}
                         </div>

@@ -11,12 +11,9 @@ export default function StudentProfile() {
   const { studentUser, API_URL, showToast, updateStudentUser, loginStudent } = useAppContext();
   const navigate = useNavigate();
 
-  // Redirect to login if not logged in
-  if (!studentUser) return <Navigate to="/student-login" replace />;
-
-  const [name, setName]               = useState(studentUser.name || "");
-  const [branch, setBranch]           = useState(studentUser.branch || "");
-  const [gradYear, setGradYear]       = useState(studentUser.graduationYear || "");
+  const [name, setName]               = useState(studentUser?.name || "");
+  const [branch, setBranch]           = useState(studentUser?.branch || "");
+  const [gradYear, setGradYear]       = useState(studentUser?.graduationYear || "");
   const [currentPwd, setCurrentPwd]   = useState("");
   const [newPwd, setNewPwd]           = useState("");
   const [confirmPwd, setConfirmPwd]   = useState("");
@@ -25,6 +22,9 @@ export default function StudentProfile() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving]           = useState(false);
   const [activeTab, setActiveTab]     = useState("info");
+
+  // Redirect to login if not logged in
+  if (!studentUser) return <Navigate to="/student-login" replace />;
 
   const handleSaveInfo = async (e) => {
     e.preventDefault();
