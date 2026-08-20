@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useId } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { UserPlus, Mail, Lock, User } from "lucide-react";
+import { UserPlus, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { subscribeGoogleCallback, renderGoogleButton, isGoogleConfigured } from "../googleAuth";
 
 const ALLOWED_DOMAIN = "walchandsangli.ac.in";
@@ -21,6 +21,8 @@ export default function StudentRegister({ onLogin }) {
   const [form, setForm]       = useState({ name: "", email: "", password: "", confirmPassword: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
+  const [showPwd, setShowPwd]         = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
@@ -155,7 +157,12 @@ export default function StudentRegister({ onLogin }) {
             <label style={labelStyle}><Lock size={13} style={{ marginRight: 5, verticalAlign: "middle" }} />Password</label>
             <div style={{ position: "relative" }}>
               <Lock size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-              <input id="reg-password" type="password" required placeholder="Min. 8 characters" value={form.password} onChange={set("password")} style={inputStyle} />
+              <input id="reg-password" type={showPwd ? "text" : "password"} required placeholder="Min. 8 characters" value={form.password} onChange={set("password")} style={{ ...inputStyle, paddingRight: 40 }} />
+              <button type="button" onClick={() => setShowPwd(v => !v)}
+                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", padding: 0 }}
+                aria-label={showPwd ? "Hide password" : "Show password"}>
+                {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 
@@ -163,7 +170,12 @@ export default function StudentRegister({ onLogin }) {
             <label style={labelStyle}><Lock size={13} style={{ marginRight: 5, verticalAlign: "middle" }} />Confirm Password</label>
             <div style={{ position: "relative" }}>
               <Lock size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)", pointerEvents: "none" }} />
-              <input id="reg-confirm-password" type="password" required placeholder="Repeat password" value={form.confirmPassword} onChange={set("confirmPassword")} style={inputStyle} />
+              <input id="reg-confirm-password" type={showConfirmPwd ? "text" : "password"} required placeholder="Repeat password" value={form.confirmPassword} onChange={set("confirmPassword")} style={{ ...inputStyle, paddingRight: 40 }} />
+              <button type="button" onClick={() => setShowConfirmPwd(v => !v)}
+                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", padding: 0 }}
+                aria-label={showConfirmPwd ? "Hide password" : "Show password"}>
+                {showConfirmPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 

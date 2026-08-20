@@ -16,7 +16,7 @@ export default function StudentProfile() {
   const navigate = useNavigate();
 
   // Redirect to login if not logged in
-  if (!studentUser) return <Navigate to="/student-login" replace />;
+  if (!studentUser) return <Navigate to="/login" replace />;
 
   // ── Account info state ────────────────────────────────────────────────────
   const [name, setName]       = useState(studentUser.name || "");
@@ -331,7 +331,7 @@ export default function StudentProfile() {
                     <div>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>OTP Sent!</p>
                       <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-                        A 6-digit code was sent to <strong>{studentUser.email}</strong>. Enter it below to confirm your password change.
+                        A 6-digit code was sent to <strong>{studentUser.email}</strong>. It is valid for <strong>10 minutes</strong>.
                       </p>
                     </div>
                   </div>
@@ -357,8 +357,8 @@ export default function StudentProfile() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
                     <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
                       {countdown > 0
-                        ? <>Code expires in <strong style={{ color: "var(--primary)" }}>{fmtCountdown(countdown)}</strong></>
-                        : <span style={{ color: "#ef4444" }}>OTP may have expired</span>
+                        ? <>Resend available in <strong style={{ color: "var(--primary)" }}>{fmtCountdown(countdown)}</strong></>
+                        : <span style={{ color: "var(--text-muted)" }}>You can resend now</span>
                       }
                     </span>
                     <button

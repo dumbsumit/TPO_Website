@@ -18,8 +18,8 @@ const getArg = (flag) => {
   return idx !== -1 ? args[idx + 1] : null;
 };
 
-const name     = getArg("--name");
-const email    = getArg("--email");
+const name = getArg("--name");
+const email = getArg("--email");
 const password = getArg("--password");
 
 if (!name || !email || !password) {
@@ -41,7 +41,7 @@ if (password.length < 8) {
   process.exit(1);
 }
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/tpo_db";
+const MONGO_URI = process.env.MONGO_URI;
 
 try {
   await mongoose.connect(MONGO_URI);
@@ -58,9 +58,9 @@ try {
 
   const admin = await Admin.create({
     name,
-    email:    email.toLowerCase(),
+    email: email.toLowerCase(),
     password: passwordHash,
-    role:     "tpo_admin",
+    role: "tpo_admin",
     isVerified: true,
   });
 

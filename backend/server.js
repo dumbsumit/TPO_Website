@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 import router from "./routes.js";
 import authAdminRouter from "./routes/authAdmin.js";
 import authStudentRouter from "./routes/authStudent.js";
+import authResetRouter from "./routes/authReset.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,12 +17,12 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
-const PORT = process.env.PORT || 5001;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/tpo_db";
+const PORT = process.env.PORT;
+const MONGO_URI = process.env.MONGO_URI;
 
 // ─── Core Middleware ──────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  origin: process.env.CLIENT_URL,
   credentials: true,   // required for httpOnly cookies cross-origin
 }));
 app.use(express.json());
@@ -41,8 +42,9 @@ const checkDbConnection = (req, res, next) => {
 };
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth/admin", checkDbConnection, authAdminRouter);
+app.use("/api/auth/admin",  checkDbConnection, authAdminRouter);
 app.use("/api/auth/student", checkDbConnection, authStudentRouter);
+app.use("/api/auth/reset",   checkDbConnection, authResetRouter);
 app.use("/api", router);
 
 // ─── Health check ─────────────────────────────────────────────────────────────

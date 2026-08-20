@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { useAppContext } from "../appContext";
-import { 
-  Trophy, Briefcase, Building2, CheckCircle2, ShieldCheck 
+import {
+  Trophy, Briefcase, Building2, CheckCircle2, ShieldCheck
 } from "lucide-react";
 import RichTextDisplay from "../components/RichTextDisplay";
 
@@ -44,6 +44,22 @@ const RECRUITING_PARTNERS = [
   { name: "AutomationEdge", logo: "/logos/automation edge.png" }
 ];
 
+const getCompanyLogo = (companyName) => {
+  if (!companyName) return null;
+  const nameLower = companyName.toLowerCase().trim();
+  const match = RECRUITING_PARTNERS.find(p => {
+    const pName = p.name.toLowerCase().trim();
+    return pName === nameLower || nameLower.includes(pName) || pName.includes(nameLower);
+  });
+  if (match) return match.logo;
+  if (nameLower.includes("hul")) return "/logos/hul.png";
+  if (nameLower.includes("schneider")) return "/logos/schnider.jpg";
+  if (nameLower.includes("siemens")) return "/logos/seimens2.png";
+  if (nameLower.includes("seagate")) return "/logos/seafate.jpeg";
+  if (nameLower.includes("ather")) return "/logos/AtherLogo.jpg";
+  return null;
+};
+
 export default function Home() {
   const { API_URL } = useAppContext();
   const [stats, setStats] = useState({
@@ -79,7 +95,7 @@ export default function Home() {
 
   return (
     <div>
-      
+
       {/* 1. WELCOME TO WCE SANGLI SECTION */}
       <section className="welcome-section">
         <div className="welcome-content">
@@ -117,12 +133,12 @@ export default function Home() {
         </div>
 
         <div className="welcome-image-container">
-          <img 
-            src="/campus_library.png" 
-            alt="Walchand College Campus Library" 
+          <img
+            src="/campus_library.png"
+            alt="Walchand College Campus Library"
             className="welcome-image"
           />
-          
+
           {/* Floating Badge 1 */}
           <div className="floating-badge" style={{ top: "30px", right: "-15px" }}>
             <div className="floating-badge-avatars">
@@ -205,7 +221,7 @@ export default function Home() {
 
         {/* 3. HEARTIEST CONGRATULATIONS STUDENTS LIST */}
         <div className="congrats-slider-container">
-          
+
           <div className="congrats-card">
             <div className="congrats-info">
               <div>
@@ -254,7 +270,7 @@ export default function Home() {
             <h3 className="partners-title">Our Recruiting Partners</h3>
             <p className="partners-subtitle">Leading global organizations hiring talent from Walchand College of Engineering</p>
           </div>
-          
+
           <div className="partners-grid">
             {RECRUITING_PARTNERS.map((partner, idx) => (
               <div
@@ -305,18 +321,11 @@ export default function Home() {
 
       </section>
 
-      {/* 5. TPO OFFICE BOARD SECTION */}
-      <section className="card" style={{ borderLeft: "4px solid var(--primary)", background: "var(--bg-secondary)", padding: 30, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 22, marginBottom: 10, color: "var(--primary)" }}>Training & Placement Office (TPO) Notice</h2>
-        <p style={{ color: "var(--text-secondary)", fontSize: 14.5, lineHeight: 1.6 }}>
-          Recruiter spreadsheet submissions (Excel/CSV formats) are processed directly by TPO staff to ensure student placement statistics are updated in real-time. Students must maintain correct branch details and profile credentials on the main campus ERP platform to guarantee seamless credential matching during recruitment drives.
-        </p>
-      </section>
 
       {/* 6. FEATURED STUDENT RESPONSES */}
       <section style={{ margin: "40px 0 10px" }}>
         <h2 className="wce-heading">Featured Student Responses</h2>
-        <div className="wce-subheading">Recently approved by TPO for public viewing</div>
+        <div className="wce-subheading">Real interview insights, preparation guidance, and campus recruitment experiences shared by seniors</div>
         <div className="wce-divider"></div>
 
         {loading ? (
@@ -327,17 +336,38 @@ export default function Home() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 18 }}>
-            {featuredExperiences.map(exp => (
-              <article key={exp._id} className="card" style={{ padding: 22, borderTop: "3px solid var(--primary)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-                  <div>
-                    <h3 style={{ fontSize: 18, marginBottom: 4 }}>{exp.companyName}</h3>
-                    <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{exp.branch} · Class of {exp.graduationYear}</p>
+            {featuredExperiences.map(exp => {
+              const logoUrl = getCompanyLogo(exp.companyName);
+              return (
+                <article key={exp._id} className="card" style={{ padding: 22, borderTop: "3px solid var(--primary)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <h3 style={{ fontSize: 18, marginBottom: 4 }}>{exp.companyName}</h3>
+                      <p style={{ fontSize: 12, color: "var(--text-muted)" }}>{exp.branch} · Class of {exp.graduationYear}</p>
+                    </div>
+                    {logoUrl && (
+                      <div style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 8,
+                        background: "#ffffff",
+                        padding: 4,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: "1px solid var(--border-color)",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+                        flexShrink: 0,
+                        overflow: "hidden"
+                      }}>
+                        <img
+                          src={logoUrl}
+                          alt={`${exp.companyName} logo`}
+                          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                        />
+                      </div>
+                    )}
                   </div>
-                  <span className="tag" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success)", border: "none", fontWeight: 600 }}>
-                    ON HOME
-                  </span>
-                </div>
 
                 <RichTextDisplay content={exp.prepTips || "No extra advice was added with this response."} style={{ marginBottom: 12 }} />
 
@@ -347,7 +377,8 @@ export default function Home() {
                   <span><strong>Technologies:</strong> {(exp.technologies || []).join(", ") || "None"}</span>
                 </div>
               </article>
-            ))}
+            );
+          })}
           </div>
         )}
 
@@ -357,7 +388,7 @@ export default function Home() {
           </Link>
         </div>
       </section>
-      
+
     </div>
   );
 }

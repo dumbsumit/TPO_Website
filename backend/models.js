@@ -66,8 +66,10 @@ const UserSchema = new mongoose.Schema({
   branch: { type: String, default: "" },
   graduationYear: { type: Number, default: null },
   isVerified: { type: Boolean, default: false },
-  otpHash:   { type: String, default: null },  // bcrypt hash of pending OTP
+  otpHash:   { type: String, default: null },  // bcrypt hash of OTP (email verify / change-password)
   otpExpiry: { type: Date,   default: null },  // OTP expiry timestamp
+  resetTokenHash:   { type: String, default: null },  // SHA-256 of password-reset token
+  resetTokenExpiry: { type: Date,   default: null },  // Reset token expiry (15 min)
   refreshTokenHash: { type: String, default: null },
 }, { timestamps: true });
 

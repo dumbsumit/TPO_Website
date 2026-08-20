@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useId } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { LogIn, Mail, Lock, UserPlus } from "lucide-react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { LogIn, Mail, Lock, UserPlus, Eye, EyeOff } from "lucide-react";
 import { subscribeGoogleCallback, renderGoogleButton, isGoogleConfigured } from "../googleAuth";
 import { useAppContext } from "../appContext";
 
@@ -22,6 +22,8 @@ const Spinner = () => (
 export default function Login({ onLoginAdmin, onLoginStudent }) {
   const navigate    = useNavigate();
   const { API_URL } = useAppContext();
+  const [searchParams] = useSearchParams();
+  const resetSuccess   = searchParams.get("reset") === "success";
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -127,6 +129,13 @@ export default function Login({ onLoginAdmin, onLoginStudent }) {
           </p>
         </div>
 
+        {/* Reset success banner */}
+        {resetSuccess && (
+          <div style={{ marginBottom: 18, fontSize: 13, padding: "10px 14px", borderRadius: 8, background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", color: "#86efac" }}>
+            ✅ Password reset successfully! You can now sign in with your new password.
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div style={{ marginBottom: 18, fontSize: 13, padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5" }}>
@@ -165,10 +174,18 @@ export default function Login({ onLoginAdmin, onLoginStudent }) {
             <button
               type="button"
               onClick={() => setShowPwd(v => !v)}
-              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 12, padding: 0 }}
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", display: "flex", alignItems: "center", padding: 0 }}
+              aria-label={showPwd ? "Hide password" : "Show password"}
             >
-              {showPwd ? "Hide" : "Show"}
+              {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
+          </div>
+
+          {/* Forgot password */}
+          <div style={{ textAlign: "right", marginTop: -4 }}>
+            <Link to="/forgot-password" style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none", fontWeight: 500 }}>
+              Forgot password?
+            </Link>
           </div>
 
           {/* Submit */}
@@ -177,7 +194,7 @@ export default function Login({ onLoginAdmin, onLoginStudent }) {
             type="submit"
             disabled={loading}
             className="btn btn-primary"
-            style={{ marginTop: 4, padding: "11px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            style={{ marginTop: 2, padding: "11px", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
           >
             {loading ? <Spinner /> : <><LogIn size={16} /> Sign In</>}
           </button>

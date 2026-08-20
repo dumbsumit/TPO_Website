@@ -1,31 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { HashRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { Shield, LogOut, CheckCircle, AlertTriangle, Info, Menu, X, User } from "lucide-react";
 import { initGoogleAuth } from "./googleAuth";
 
 // ── Pages ──────────────────────────────────────────────────────────────────────
-import Home             from "./pages/Home";
-import Companies        from "./pages/Companies";
-import CompanyDetails   from "./pages/CompanyDetails";
-import Experiences      from "./pages/Experiences";
+import Home from "./pages/Home";
+import Companies from "./pages/Companies";
+import CompanyDetails from "./pages/CompanyDetails";
+import Experiences from "./pages/Experiences";
 import SubmitExperience from "./pages/SubmitExperience";
-import Login            from "./pages/Login";
-import AdminDashboard   from "./pages/AdminDashboard";
-import StudentRegister  from "./pages/StudentRegister";
-import OTPVerify        from "./pages/OTPVerify";
-import AdminProfile     from "./pages/AdminProfile";
-import StudentProfile   from "./pages/StudentProfile";
-import { AppContext }   from "./appContext";
+import Login from "./pages/Login";
+import AdminDashboard from "./pages/AdminDashboard";
+import StudentRegister from "./pages/StudentRegister";
+import OTPVerify from "./pages/OTPVerify";
+import AdminProfile from "./pages/AdminProfile";
+import StudentProfile from "./pages/StudentProfile";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import { AppContext } from "./appContext";
 
 const API_URL = "/api";
 
 export default function App() {
   // ── Auth state ─────────────────────────────────────────────────────────────
-  const [adminUser,   setAdminUser]   = useState(null);  // { name, email, role }
+  const [adminUser, setAdminUser] = useState(null);  // { name, email, role }
   const [studentUser, setStudentUser] = useState(null);  // { name, email, role, isVerified, … }
   const [sessionLoading, setSessionLoading] = useState(true);
 
-  const [toast,          setToast]          = useState(null);
+  const [toast, setToast] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ── Restore sessions from httpOnly cookies on mount ────────────────────────
@@ -82,7 +84,7 @@ export default function App() {
     } catch { /* ignore */ }
     setAdminUser(null);
     showToast("Logged out successfully", "info");
-    window.location.hash = "/";
+    window.location.replace("/");
   };
 
   // ── Student auth ──────────────────────────────────────────────────────────
@@ -99,13 +101,13 @@ export default function App() {
     } catch { /* ignore */ }
     setStudentUser(null);
     showToast("Logged out successfully", "info");
-    window.location.hash = "/";
+    window.location.replace("/");
   };
 
   // ── Protected Route wrappers ──────────────────────────────────────────────
   const AdminRoute = ({ children }) => {
     if (sessionLoading) return null;
-    return adminUser ? children : <Navigate to="/admin-login" replace />;
+    return adminUser ? children : <Navigate to="/login" replace />;
   };
 
   // Logged-in student only — guests redirected to home
@@ -115,7 +117,7 @@ export default function App() {
   };
 
   // ── Context value ──────────────────────────────────────────────────────────
-  const updateAdminUser  = (u) => setAdminUser(u);
+  const updateAdminUser = (u) => setAdminUser(u);
   const updateStudentUser = (u) => setStudentUser(u);
 
   const ctx = {
@@ -149,9 +151,6 @@ export default function App() {
               <div className="top-bar-left">
                 <span className="top-bar-item">📞 +91 233 2300383</span>
                 <span className="top-bar-item">✉ info@walchandsangli.ac.in</span>
-              </div>
-              <div className="top-bar-right">
-                <span>Online Services</span><span>•</span><span>Communication</span>
               </div>
             </div>
           </div>
@@ -260,16 +259,20 @@ export default function App() {
                 <Route path="/login" element={<Login onLoginAdmin={loginAdmin} onLoginStudent={loginStudent} />} />
                 {/* Legacy redirects — keep old URLs working */}
                 <Route path="/student-login" element={<Navigate to="/login" replace />} />
-                <Route path="/admin-login"   element={<Navigate to="/login?role=admin" replace />} />
+                <Route path="/admin-login" element={<Navigate to="/login?role=admin" replace />} />
+
+                {/* ── Password reset (public) ── */}
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password"  element={<ResetPassword />} />
 
                 {/* ── Admin routes ── */}
                 <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                <Route path="/admin-profile"   element={<AdminRoute><AdminProfile /></AdminRoute>} />
+                <Route path="/admin-profile" element={<AdminRoute><AdminProfile /></AdminRoute>} />
 
                 {/* ── Student routes ── */}
                 <Route path="/student-register" element={<StudentRegister onLogin={loginStudent} />} />
-                <Route path="/verify-otp"       element={<OTPVerify       onLogin={loginStudent} />} />
-                <Route path="/student-profile"  element={<StudentProfile />} />
+                <Route path="/verify-otp" element={<OTPVerify onLogin={loginStudent} />} />
+                <Route path="/student-profile" element={<StudentProfile />} />
 
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
@@ -279,10 +282,8 @@ export default function App() {
           {/* Footer */}
           <footer style={{ borderTop: "1px solid var(--border-color)", padding: "24px 0", backgroundColor: "var(--bg-secondary)", color: "var(--text-secondary)", fontSize: "14px", textAlign: "center" }}>
             <div className="container">
-              <p>&copy; {new Date().getFullYear()} College Placement Cell &amp; Activity Portal. All rights reserved.</p>
-              <p style={{ marginTop: 6, fontSize: "12px", color: "var(--text-muted)" }}>
-                Built with MongoDB, Express, React, and Node.js. Developed for quick access and live metrics.
-              </p>
+              <p>&copy; {new Date().getFullYear()} Walchand College of Engineering Placement Cell &amp; Activity Portal. All rights reserved.</p>
+
             </div>
           </footer>
 
@@ -290,8 +291,8 @@ export default function App() {
           {toast && (
             <div className={`toast ${toast.type}`}>
               {toast.type === "success" && <CheckCircle size={18} />}
-              {toast.type === "error"   && <AlertTriangle size={18} />}
-              {toast.type === "info"    && <Info size={18} />}
+              {toast.type === "error" && <AlertTriangle size={18} />}
+              {toast.type === "info" && <Info size={18} />}
               <span>{toast.message}</span>
             </div>
           )}
