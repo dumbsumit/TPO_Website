@@ -514,15 +514,7 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
       
       const company1Name = getVal(row, norm, ["Company 1", "Company1", "company1"]);
       const salary1Raw = getVal(row, norm, ["Salary (LPA)", "Salary1", "salary1", "salarylpa"]);
-      const company2Name = getVal(row, norm, ["Company 2", "Company2", "company2"]);
-      const salary2Raw = getVal(row, norm, ["Salary (LPA)_1", "Salary2", "salary2", "salarylpa1"]);
-      
-      const internshipOffered = getVal(row, norm, ["Internship Offered", "InternshipOffered", "internshipoffered", "internship"]);
-      const internshipCompany = getVal(row, norm, ["Internship Company", "InternshipCompany", "internshipcompany"]);
-      const internshipStartDateRaw = getVal(row, norm, ["Internship Start Date", "InternshipStartDate", "internshipstartdate"]);
-      const internshipEndDateRaw = getVal(row, norm, ["Internship End Date", "InternshipEndDate", "internshipenddate"]);
-      const stipendRaw = getVal(row, norm, ["Stipend", "stipend"]);
-      
+
       const personalMail = getVal(row, norm, ["Personal Mail", "PersonalMail", "personalmail"]);
       const collegeMail = getVal(row, norm, ["College Mail", "CollegeMail", "collegemail"]);
       const phoneNo = getVal(row, norm, ["Phone No", "PhoneNo", "phoneno", "phone"]);
@@ -562,17 +554,6 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
           continue;
         }
         salary1 = num;
-      }
-
-      let salary2 = undefined;
-      if (salary2Raw !== undefined && salary2Raw !== "") {
-        const num = Number(salary2Raw);
-        if (isNaN(num)) {
-          failedRecords++;
-          failedRows.push({ rowNumber, field: "Salary (LPA)_1", errorReason: `Invalid salary package for Company 2: '${salary2Raw}' is not a valid number` });
-          continue;
-        }
-        salary2 = num;
       }
 
       let stipend = undefined;
@@ -683,11 +664,10 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
           return comp;
         };
 
-        // Map Company 1 as PRIMARY offer
+        // Map Company 1 as PRIMARY offer exclusively
         if (company1Name) {
           const comp1 = await getOrCreateCompanyObj(company1Name, salary1);
           if (comp1) {
-            // Find or create PRIMARY offer
             await PlacementOffer.findOneAndUpdate(
               { studentId: student._id, companyId: comp1._id, offerType: "PRIMARY" },
               {
@@ -697,44 +677,22 @@ router.post("/admin/import-placement-excel", authenticateAdmin, upload.single("f
               },
               { upsert: true }
             );
-          }
-        }
 
-        // Map Company 2 as SECONDARY offer
-        if (company2Name) {
-          const comp2 = await getOrCreateCompanyObj(company2Name, salary2);
-          if (comp2) {
-            // Find or create SECONDARY offer
-            await PlacementOffer.findOneAndUpdate(
-              { studentId: student._id, companyId: comp2._id, offerType: "SECONDARY" },
-              {
-                packageLpa: salary2,
-                placementStatus: placementStatus || "Placed",
-                offerDate: new Date()
-              },
-              { upsert: true }
-            );
-          }
-        }
+            // Check if Placement Status indicates Internship / PPO (e.g. Inter+ppo, Internship+PPO, PPO, Internship)
+            const statusClean = String(placementStatus).trim().toLowerCase();
+            const hasPpoInStatus = statusClean.includes("ppo");
+            const hasInternInStatus = statusClean.includes("intern") || statusClean.includes("inter");
 
-        // Store Internship info separately
-        const isInternshipOffered = String(internshipOffered).trim().toLowerCase() === "yes";
-        const intCompName = String(internshipCompany).trim() || String(company1Name).trim();
-        
-        if (isInternshipOffered && intCompName) {
-          const intComp = await getOrCreateCompanyObj(intCompName, 0);
-          if (intComp) {
-            await Internship.findOneAndUpdate(
-              { studentId: student._id, companyId: intComp._id },
-              {
-                startDate: internshipStartDate,
-                endDate: internshipEndDate,
-                stipend: stipend,
-                ppo: "No",
-                status: "Active"
-              },
-              { upsert: true }
-            );
+            if (hasInternInStatus || hasPpoInStatus) {
+              await Internship.findOneAndUpdate(
+                { studentId: student._id, companyId: comp1._id },
+                {
+                  ppo: hasPpoInStatus ? "Yes" : "No",
+                  status: "Active"
+                },
+                { upsert: true }
+              );
+            }
           }
         }
       } catch (err) {
@@ -838,15 +796,15 @@ router.get("/admin/dashboard-summary", authenticateAdmin, async (req, res) => {
   try {
     const totalStudents = await PlacedStudent.countDocuments({});
     
-    // Find distinct studentIds who have offers
-    const placedStudentIds = await PlacementOffer.distinct("studentId");
+    // Find distinct studentIds who have PRIMARY (Company 1) offers
+    const placedStudentIds = await PlacementOffer.distinct("studentId", { offerType: "PRIMARY" });
     const placedStudents = placedStudentIds.length;
     
     const placementPercentage = totalStudents > 0 ? parseFloat(((placedStudents / totalStudents) * 100).toFixed(2)) : 0;
     
     const totalCompanies = await Company.countDocuments({});
     
-    const offers = await PlacementOffer.find({ packageLpa: { $ne: null, $exists: true } });
+    const offers = await PlacementOffer.find({ offerType: "PRIMARY", packageLpa: { $ne: null, $exists: true } });
     const packages = offers.map(o => o.packageLpa).filter(p => typeof p === "number");
     
     const averagePackage = packages.length > 0 ? parseFloat((packages.reduce((sum, p) => sum + p, 0) / packages.length).toFixed(2)) : 0;

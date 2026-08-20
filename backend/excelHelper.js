@@ -69,10 +69,6 @@ export const parsePlacementRecordsExcel = (buffer) => {
     
     const company1 = String(row["Company 1"] || row["Company1"] || norm["company1"] || "").trim();
     const salary1 = Number(row["Salary (LPA)"] || row["Salary1"] || norm["salary1"] || norm["salarylpa"] || 0);
-    const company2 = String(row["Company 2"] || row["Company2"] || norm["company2"] || "").trim();
-    
-    // xlsx sheet_to_json handles duplicate keys by appending _1, e.g. "Salary (LPA)_1"
-    const salary2 = Number(row["Salary (LPA)_1"] || row["Salary2"] || norm["salary2"] || norm["salarylpa1"] || 0);
 
     const internshipOffered = String(row["Internship Offered"] || row["Internship"] || norm["internshipoffered"] || norm["internship"] || "No").trim();
     const internshipCompany = String(row["Internship Company"] || norm["internshipcompany"] || "").trim();
@@ -107,8 +103,6 @@ export const parsePlacementRecordsExcel = (buffer) => {
       gender,
       company1,
       salary1,
-      company2,
-      salary2,
       internshipOffered,
       internshipCompany,
       internshipStartDate,

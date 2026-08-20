@@ -104,9 +104,8 @@ export default function ExcelImports() {
   const downloadTemplate = () => {
     const headers = [
       "Sr No", "PRN", "Branch", "First Name", "Middle Name", "Last Name", "Gender",
-      "Company 1", "Salary (LPA)", "Company 2", "Salary (LPA)_1",
-      "Internship Offered", "Internship Company", "Internship Start Date", "Internship End Date",
-      "Stipend", "Personal Mail", "College Mail", "Phone No", "Placement Status"
+      "Company 1", "Salary (LPA)", "Placement Status",
+      "Personal Mail", "College Mail", "Phone No"
     ];
     const csvData = headers.join(",") + "\n";
     const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
