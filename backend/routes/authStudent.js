@@ -9,6 +9,8 @@ import {
   authenticateStudent,
   STUDENT_ACCESS_COOKIE,
   STUDENT_REFRESH_COOKIE,
+  ADMIN_ACCESS_COOKIE,
+  ADMIN_REFRESH_COOKIE,
   ACCESS_MAX_AGE,
   REFRESH_MAX_AGE,
   getCookieOptions,
@@ -118,6 +120,33 @@ const issueStudentTokens = async (student, res) => {
     branch:         student.branch,
     graduationYear: student.graduationYear,
   };
+};
+
+const issueAdminTokens = async (admin, res) => {
+  const accessPayload = {
+    id:    admin._id,
+    email: admin.email,
+    name:  admin.name,
+    role:  "tpo_admin",
+  };
+
+  const accessToken = jwt.sign(accessPayload, JWT_ACCESS_SECRET, {
+    expiresIn: "15m",
+  });
+
+  const refreshToken = jwt.sign(
+    { id: admin._id, role: "tpo_admin" },
+    JWT_REFRESH_SECRET,
+    { expiresIn: "7d" }
+  );
+
+  admin.refreshTokenHash = hashToken(refreshToken);
+  await admin.save();
+
+  res.cookie(ADMIN_ACCESS_COOKIE,  accessToken,  getCookieOptions(ACCESS_MAX_AGE));
+  res.cookie(ADMIN_REFRESH_COOKIE, refreshToken, getCookieOptions(REFRESH_MAX_AGE));
+
+  return { name: admin.name, email: admin.email, role: "tpo_admin" };
 };
 
 // ─────────────────────────────────────────────────────
@@ -272,7 +301,7 @@ router.post("/resend-otp", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────
-// POST /api/auth/student/login  — Email + Password
+// POST /api/auth/student/login  — Email + Password (auto-detects role)
 // ─────────────────────────────────────────────────────
 router.post("/login", async (req, res) => {
   try {
@@ -288,40 +317,45 @@ router.post("/login", async (req, res) => {
         .json({ message: `Only @${ALLOWED_DOMAIN} email addresses are allowed` });
     }
 
-    const student = await Student.findOne({ email: email.toLowerCase() });
-    if (!student) {
+    const user = await Student.findOne({ email: email.toLowerCase() });
+    if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    if (!student.isVerified) {
-      return res.status(403).json({
-        message: "Please verify your email before logging in.",
-        requiresVerification: true,
-        email: student.email,
-      });
-    }
-
-    if (!student.password) {
+    if (!user.password) {
       return res.status(400).json({
         message: "This account uses Google Sign-In. Please use 'Sign in with Google'.",
       });
     }
 
-    const isMatch = await bcrypt.compare(password, student.password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const user = await issueStudentTokens(student, res);
-    return res.json({ message: "Login successful", user });
+    if (user.role === "tpo_admin") {
+      const userData = await issueAdminTokens(user, res);
+      return res.json({ message: "Login successful", user: userData });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        message: "Please verify your email before logging in.",
+        requiresVerification: true,
+        email: user.email,
+      });
+    }
+
+    const userData = await issueStudentTokens(user, res);
+    return res.json({ message: "Login successful", user: userData });
   } catch (err) {
-    console.error("Student login error:", err);
+    console.error("Login error:", err);
     return res.status(500).json({ message: "Server error during login" });
   }
 });
 
 // ─────────────────────────────────────────────────────
-// POST /api/auth/student/google
+// POST /api/auth/student/google  — Google OAuth (auto-detects role)
 // ─────────────────────────────────────────────────────
 router.post("/google", async (req, res) => {
   try {
@@ -351,26 +385,31 @@ router.post("/google", async (req, res) => {
         .json({ message: `Only @${ALLOWED_DOMAIN} email addresses are allowed` });
     }
 
-    // Upsert student — Google sign-in creates account if not exists
-    let student = await Student.findOne({ email: email.toLowerCase() });
+    let user = await Student.findOne({ email: email.toLowerCase() });
 
-    if (!student) {
-      student = await Student.create({
+    if (!user) {
+      user = await Student.create({
         name,
         email:      email.toLowerCase(),
         googleId,
+        role:       "student",
         isVerified: true, // Google verifies email natively
       });
     } else {
-      if (!student.googleId) student.googleId = googleId;
-      if (!student.isVerified) student.isVerified = true;
-      await student.save();
+      if (!user.googleId) user.googleId = googleId;
+      if (!user.isVerified) user.isVerified = true;
+      await user.save();
     }
 
-    const user = await issueStudentTokens(student, res);
-    return res.json({ message: "Google sign-in successful", user });
+    if (user.role === "tpo_admin") {
+      const userData = await issueAdminTokens(user, res);
+      return res.json({ message: "Google sign-in successful", user: userData });
+    }
+
+    const userData = await issueStudentTokens(user, res);
+    return res.json({ message: "Google sign-in successful", user: userData });
   } catch (err) {
-    console.error("Student Google login error:", err);
+    console.error("Google login error:", err);
     if (err.message?.includes("Invalid token")) {
       return res.status(401).json({ message: "Invalid Google token. Please try again." });
     }

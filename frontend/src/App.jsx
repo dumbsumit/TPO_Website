@@ -9,9 +9,8 @@ import Companies        from "./pages/Companies";
 import CompanyDetails   from "./pages/CompanyDetails";
 import Experiences      from "./pages/Experiences";
 import SubmitExperience from "./pages/SubmitExperience";
-import AdminLogin       from "./pages/AdminLogin";
+import Login            from "./pages/Login";
 import AdminDashboard   from "./pages/AdminDashboard";
-import StudentLogin     from "./pages/StudentLogin";
 import StudentRegister  from "./pages/StudentRegister";
 import OTPVerify        from "./pages/OTPVerify";
 import AdminProfile     from "./pages/AdminProfile";
@@ -228,19 +227,12 @@ export default function App() {
                   </>
                 ) : (
                   /* ── Guest controls ── */
-                  <>
-                    <li>
-                      <Link to="/student-login" className="nav-link" onClick={() => setMobileMenuOpen(false)}
-                        style={{ display: "flex", alignItems: "center" }}>
-                        <User size={14} style={{ marginRight: 6 }} /> Student
-                      </Link>
-                    </li>
-                    <li>
-                      <Link to="/admin-login" className="nav-link btn-admin" onClick={() => setMobileMenuOpen(false)}>
-                        <Shield size={14} style={{ marginRight: 6 }} /> Admin
-                      </Link>
-                    </li>
-                  </>
+                  <li>
+                    <Link to="/login" className="nav-link" onClick={() => setMobileMenuOpen(false)}
+                      style={{ display: "flex", alignItems: "center" }}>
+                      <User size={14} style={{ marginRight: 6 }} /> Login
+                    </Link>
+                  </li>
                 )}
               </ul>
 
@@ -264,13 +256,17 @@ export default function App() {
                 <Route path="/experiences" element={<Experiences />} />
                 <Route path="/submit-experience" element={<StudentRoute><SubmitExperience /></StudentRoute>} />
 
+                {/* ── Unified login ── */}
+                <Route path="/login" element={<Login onLoginAdmin={loginAdmin} onLoginStudent={loginStudent} />} />
+                {/* Legacy redirects — keep old URLs working */}
+                <Route path="/student-login" element={<Navigate to="/login" replace />} />
+                <Route path="/admin-login"   element={<Navigate to="/login?role=admin" replace />} />
+
                 {/* ── Admin routes ── */}
-                <Route path="/admin-login" element={<AdminLogin onLogin={loginAdmin} />} />
                 <Route path="/admin-dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
                 <Route path="/admin-profile"   element={<AdminRoute><AdminProfile /></AdminRoute>} />
 
                 {/* ── Student routes ── */}
-                <Route path="/student-login"    element={<StudentLogin    onLogin={loginStudent} />} />
                 <Route path="/student-register" element={<StudentRegister onLogin={loginStudent} />} />
                 <Route path="/verify-otp"       element={<OTPVerify       onLogin={loginStudent} />} />
                 <Route path="/student-profile"  element={<StudentProfile />} />

@@ -61,6 +61,7 @@ try {
     email:    email.toLowerCase(),
     password: passwordHash,
     role:     "tpo_admin",
+    isVerified: true,
   });
 
   console.log(`\n✅  Admin account created successfully!`);
