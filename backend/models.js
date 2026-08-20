@@ -56,29 +56,18 @@ const GlobalStatsSchema = new mongoose.Schema({
   yearlyStats: [YearlyStatsSchema],
 }, { timestamps: true });
 
-// ─── Admin (TPO) ──────────────────────────────────────────────────────────────
-const AdminSchema = new mongoose.Schema({
+// ─── Unified User ─────────────────────────────────────────────────────────────
+const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, default: null },   // null → Google-only account
   googleId: { type: String, default: null },
-  role: { type: String, default: "tpo_admin" },
-  refreshTokenHash: { type: String, default: null },
-  otpHash:   { type: String, default: null },  // bcrypt hash of pending OTP
-  otpExpiry: { type: Date,   default: null },  // OTP expiry timestamp
-}, { timestamps: true });
-
-// ─── Student ──────────────────────────────────────────────────────────────────
-const StudentSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password: { type: String, default: null },   // null → Google-only account
-  googleId: { type: String, default: null },
+  role: { type: String, required: true, enum: ["student", "tpo_admin"], default: "student" },
   branch: { type: String, default: "" },
   graduationYear: { type: Number, default: null },
   isVerified: { type: Boolean, default: false },
-  otpHash: { type: String, default: null },
-  otpExpiry: { type: Date, default: null },
+  otpHash:   { type: String, default: null },  // bcrypt hash of pending OTP
+  otpExpiry: { type: Date,   default: null },  // OTP expiry timestamp
   refreshTokenHash: { type: String, default: null },
 }, { timestamps: true });
 
@@ -86,8 +75,9 @@ export const Company = mongoose.model("Company", CompanySchema);
 export const Experience = mongoose.model("Experience", ExperienceSchema);
 export const GlobalStats = mongoose.model("GlobalStats", GlobalStatsSchema);
 export const YearlyStats = mongoose.model("YearlyStats", YearlyStatsSchema);
-export const Admin = mongoose.model("Admin", AdminSchema);
-export const Student = mongoose.model("Student", StudentSchema);
+export const User = mongoose.model("User", UserSchema);
+export const Admin = User;
+export const Student = User;
 
 // ─── PlacedStudent ────────────────────────────────────────────────────────────
 const PlacedStudentSchema = new mongoose.Schema({
